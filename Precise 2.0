@@ -1,1 +1,220 @@
-https://github.com/goofyashnkr/precise/raw/93c3eab2a0ca0632edb7412f3e9042f2936787a2/Precise%202.0%22))()
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+
+-- CONFIGURATION
+local Settings = {
+    HRP_Size = 2.5,
+    HRP_Trans = 0.5,
+    SolidToggle = false,
+    Solid_Size = 5,
+    WalkSpeed = 16,        
+    WS_Protection = true,  
+    AntiWeave = true,
+    TPWalkEnabled = false,
+    -- NEW SETTINGS
+    SmartBox = false, -- Master Toggle for Health/Knock Check
+    PunchEnabled = false,
+    PunchSpeed = 1.7
+}
+
+local isTriggerHeld = false
+local TP_SPEED = 70
+local originalHRPProps = {}
+
+-- PUNCH ANIMATION IDS
+local punchIDs = {
+    ["rbxassetid://18312333191"] = true, ["rbxassetid://18312335714"] = true,
+    ["rbxassetid://18312338197"] = true, ["rbxassetid://18312340119"] = true,
+    ["rbxassetid://18312344029"] = true, ["rbxassetid://18312346524"] = true,
+    ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
+}
+
+-- UI SETUP
+local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+ScreenGui.Name = "PRECISE_2.0"
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 320, 0, 560) 
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -280)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Text = "PRECISE 2.0"
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SourceSansBold
+Title.TextSize = 20
+Title.BackgroundTransparency = 1
+
+-- INPUT BOXES
+local function createSmartInput(text, pos, default, key)
+    local lab = Instance.new("TextLabel", MainFrame)
+    lab.Position = UDim2.new(0, 15, 0, pos)
+    lab.Size = UDim2.new(0, 120, 0, 30)
+    lab.Text = text
+    lab.TextColor3 = Color3.fromRGB(200, 200, 200)
+    lab.BackgroundTransparency = 1
+    lab.TextXAlignment = Enum.TextXAlignment.Left
+
+    local box = Instance.new("TextBox", MainFrame)
+    box.Size = UDim2.new(0, 100, 0, 25)
+    box.Position = UDim2.new(0, 180, 0, pos + 2)
+    box.Text = tostring(default)
+    box.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    box.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+    box.FocusLost:Connect(function()
+        Settings[key] = tonumber(box.Text:match("[%d%.]+")) or default
+        box.Text = tostring(Settings[key])
+    end)
+end
+
+createSmartInput("Hitbox Size:", 50, Settings.HRP_Size, "HRP_Size")
+createSmartInput("Transparency:", 85, Settings.HRP_Trans, "HRP_Trans")
+createSmartInput("Walk Speed:", 120, Settings.WalkSpeed, "WalkSpeed")
+createSmartInput("Shell Size:", 155, Settings.Solid_Size, "Solid_Size")
+createSmartInput("Punch Speed:", 190, Settings.PunchSpeed, "PunchSpeed")
+
+-- TOGGLE BUTTONS
+local function createToggle(text, pos, key)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0, 280, 0, 32)
+    btn.Position = UDim2.new(0, 15, 0, pos)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SourceSansBold
+
+    local function updateVisual()
+        btn.Text = text .. ": " .. (Settings[key] and "ON" or "OFF")
+        btn.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(50, 50, 55)
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        Settings[key] = not Settings[key]
+        updateVisual()
+    end)
+    updateVisual()
+    return btn
+end
+
+createToggle("WS PROTECTION", 230, "WS_Protection")
+createToggle("ANTI-STUN", 270, "AntiWeave")
+createToggle("SOLID SHELL", 310, "SolidToggle")
+createToggle("TP WALK (])", 350, "TPWalkEnabled")
+createToggle("SMART BOX", 390, "SmartBox")
+createToggle("PUNCH SPEED", 430, "PunchEnabled")
+
+--------------------------------------------------
+-- CORE LOGIC
+--------------------------------------------------
+
+local function getKnockedBool(p)
+    local live = workspace:FindFirstChild("Live")
+    local entry = live and live:FindFirstChild(p.Name)
+    local knocked = entry and entry:FindFirstChild("Knocked")
+    return knocked and knocked:IsA("BoolValue") and knocked.Value or false
+end
+
+local function applyPunchSpeed()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local anim = hum and hum:FindFirstChildOfClass("Animator")
+    
+    if anim then
+        for _, t in ipairs(anim:GetPlayingAnimationTracks()) do
+            if t.Animation and punchIDs[tostring(t.Animation.AnimationId):lower()] then
+                pcall(function() 
+                    t:AdjustSpeed(Settings.PunchEnabled and Settings.PunchSpeed or 1) 
+                end)
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
+    
+    -- Movement & Anti-Stun
+    if hum then
+        if hum.MoveDirection.Magnitude > 0 and (not Settings.WS_Protection or not isTriggerHeld) then
+            if hum.WalkSpeed ~= targetSpeed then hum.WalkSpeed = targetSpeed end
+        end
+        if Settings.AntiWeave then
+            local live = workspace:FindFirstChild("Live")
+            local playerChar = (live and live:FindFirstChild(LocalPlayer.Name)) or char
+            local stun = playerChar and playerChar:FindFirstChild("WeaveStun")
+            if stun then pcall(function() stun:Destroy() end) end
+        end
+    end
+
+    applyPunchSpeed()
+
+    -- HITBOX SYSTEM
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= LocalPlayer and v.Character then
+            local root = v.Character:FindFirstChild("HumanoidRootPart")
+            local vHum = v.Character:FindFirstChildOfClass("Humanoid")
+            
+            -- HITBOX LOGIC SEPARATION
+            local shouldExpand = false
+            
+            if Settings.SmartBox then
+                -- Smart Logic: Only Expand if Alive and Not Knocked
+                if vHum and vHum.Health > 0 and not getKnockedBool(v) then
+                    shouldExpand = true
+                else
+                    shouldExpand = false
+                end
+            else
+                -- Regular Logic: Always Expand if there's a size value
+                shouldExpand = (Settings.HRP_Size > 2) 
+            end
+
+            if root then
+                if shouldExpand then
+                    root.Size = Vector3.new(Settings.HRP_Size, Settings.HRP_Size, Settings.HRP_Size)
+                    root.Transparency = Settings.HRP_Trans
+                    root.CanCollide = false
+                else
+                    -- Return to default hitbox size (standard is 2, 2, 1)
+                    root.Size = Vector3.new(2, 2, 1)
+                    root.Transparency = 0
+                end
+                
+                -- Shell Logic
+                local shell = root:FindFirstChild("SolidShell")
+                if Settings.SolidToggle and shouldExpand then
+                    if not shell then
+                        shell = Instance.new("Part", root)
+                        shell.Name = "SolidShell"
+                        shell.Transparency = 1
+                    end
+                    shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size)
+                    shell.CFrame = root.CFrame
+                elseif shell then
+                    shell:Destroy()
+                end
+            end
+        end
+    end
+end)
+
+-- INPUTS
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = true end
+    if input.KeyCode == Enum.KeyCode.M or input.KeyCode == Enum.KeyCode.ButtonSelect then MainFrame.Visible = not MainFrame.Visible end
+    if input.KeyCode == Enum.KeyCode.RightBracket then Settings.TPWalkEnabled = not Settings.TPWalkEnabled end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = false end
+end)
