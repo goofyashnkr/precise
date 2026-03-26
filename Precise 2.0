@@ -28,7 +28,7 @@ local Settings = {
 }
 
 local isTriggerHeld = false
-local isStomping = false -- ADDON: State tracker
+local isStomping = false 
 local TP_SPEED = 70
 
 local punchIDs = {
@@ -172,7 +172,7 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- STOMP & PUNCH DETECTION
+    -- ANIMATION DETECTION
     local foundStomp = false
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
@@ -194,22 +194,21 @@ RunService.Heartbeat:Connect(function()
             local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
             
             if root then
+                -- PRIORITY OVERRIDE: Stomp always wins
                 if isStomping then
-                    -- OVERRIDE: Stomp always forces expansion regardless of SmartBox or Target
                     root.Size = Vector3.new(Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Size)
                     root.Transparency = Settings.Stomp_HRP_Trans
                     root.CanCollide = false
                 else
-                    -- NORMAL LOGIC: Respect SmartBox
-                    local shouldExpand = true
+                    -- SMART BOX LOGIC: Only expands if player is alive/not knocked
+                    local allowedBySmartBox = true
                     if Settings.SmartBox then
-                        shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
+                        allowedBySmartBox = (vHum and vHum.Health > 0 and not getKnockedBool(v))
                     end
 
-                    if shouldExpand then
+                    if allowedBySmartBox then
                         local size = isTarget and Settings.Target_HRP_Size or Settings.HRP_Size
                         local trans = isTarget and Settings.Target_HRP_Trans or Settings.HRP_Trans
-                        
                         root.Size = Vector3.new(size, size, size)
                         root.Transparency = trans
                         root.CanCollide = false
@@ -219,7 +218,7 @@ RunService.Heartbeat:Connect(function()
                     end
                 end
                 
-                -- SOLID SHELL LOGIC
+                -- SOLID SHELL
                 local shell = root:FindFirstChild("SolidShell")
                 if Settings.SolidToggle and (isStomping or (vHum and vHum.Health > 0 and not getKnockedBool(v))) then
                     if not shell then
