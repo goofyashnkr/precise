@@ -11,8 +11,8 @@ local Settings = {
     TargetPlayer = "", 
     Target_HRP_Size = 6, 
     Target_HRP_Trans = 0.5,
-    Stomp_HRP_Size = 8, -- ADDON: Stomp Hitbox Size
-    Stomp_HRP_Trans = 0.7, -- ADDON: Stomp Hitbox Transparency
+    Stomp_HRP_Size = 8, -- Size when stomping
+    Stomp_HRP_Trans = 0.7, 
     Off_Size = 2, 
     Off_Trans = 1, 
     SolidToggle = false,
@@ -24,11 +24,11 @@ local Settings = {
     SmartBox = false, 
     PunchEnabled = false, 
     PunchSpeed = 1.7,
-    StompSpeed = 1.0 -- ADDON: Stomp Animation Speed
+    StompSpeed = 1.0 
 }
 
 local isTriggerHeld = false
-local isStomping = false -- ADDON: State tracker
+local isStomping = false 
 local TP_SPEED = 70
 
 local punchIDs = {
@@ -38,6 +38,7 @@ local punchIDs = {
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
 
+-- ONLY THESE IDS TRIGGER THE STOMP EXPANSION
 local stompIDs = {
     ["rbxassetid://17837722603"] = true,
     ["rbxassetid://18362264385"] = true,
@@ -49,7 +50,7 @@ ScreenGui.Name = "PRECISE_2.0_MODERN"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 720) -- Height increased for stomp addons
+MainFrame.Size = UDim2.new(0, 320, 0, 720) 
 MainFrame.Position = UDim2.new(0.5, -160, 0.5, -360)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 MainFrame.BackgroundTransparency = 0.25
@@ -207,9 +208,10 @@ RunService.Heartbeat:Connect(function()
                 currentTrans = Settings.HRP_Trans
             end
             
+            -- Expansion Logic: Always expand if currently stomping (ignores SmartBox/Knocked)
             local shouldExpand = false
             if isStomping then
-                shouldExpand = true -- Force expansion while stomping regardless of other conditions
+                shouldExpand = true 
             elseif Settings.SmartBox then
                 shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
             else
