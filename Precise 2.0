@@ -9,11 +9,13 @@ local Settings = {
     HRP_Size = 3,
     HRP_Trans = 0.8,
     TargetPlayer = "", 
-    Target_HRP_Size = 6, -- NEW: Specific size for your target
-    Target_HRP_Trans = 0.5, -- NEW: Specific transparency for your target
+    Target_HRP_Size = 6, 
+    Target_HRP_Trans = 0.5,
+    Off_Size = 2, -- NEW: Adjustable size for when SmartBox is 'Off' (Knocked/Dead)
+    Off_Trans = 1, -- NEW: Adjustable transparency for 'Off' state
     SolidToggle = false,
     Solid_Size = 5,
-    WalkSpeed = 11.5,        
+    WalkSpeed = 11.5,         
     WS_Protection = true,  
     AntiWeave = true,
     TPWalkEnabled = false,
@@ -32,14 +34,14 @@ local punchIDs = {
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
 
--- UI SETUP
+-- UI SETUP (Original Style)
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 ScreenGui.Name = "PRECISE_2.0_MODERN"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 620) -- Slightly taller for new options
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -310)
+MainFrame.Size = UDim2.new(0, 320, 0, 640) -- Adjusted height for new inputs
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -320)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 MainFrame.BackgroundTransparency = 0.25
 MainFrame.BorderSizePixel = 0
@@ -101,9 +103,15 @@ createSmartInput("Target Trans:", 110, Settings.Target_HRP_Trans, "Target_HRP_Tr
 -- GLOBAL SECTION
 createSmartInput("Global Size:", 150, Settings.HRP_Size, "HRP_Size", true)
 createSmartInput("Global Trans:", 180, Settings.HRP_Trans, "HRP_Trans", true)
-createSmartInput("Walk Speed:", 210, Settings.WalkSpeed, "WalkSpeed", true)
-createSmartInput("Shell Size:", 240, Settings.Solid_Size, "Solid_Size", true)
-createSmartInput("Punch Speed:", 270, Settings.PunchSpeed, "PunchSpeed", true)
+
+-- OFF-STATE SECTION (NEW)
+createSmartInput("Off-State Size:", 220, Settings.Off_Size, "Off_Size", true)
+createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
+
+-- MISC SECTION
+createSmartInput("Walk Speed:", 290, Settings.WalkSpeed, "WalkSpeed", true)
+createSmartInput("Shell Size:", 320, Settings.Solid_Size, "Solid_Size", true)
+createSmartInput("Punch Speed:", 350, Settings.PunchSpeed, "PunchSpeed", true)
 
 local function createToggle(text, pos, key)
     local btn = Instance.new("TextButton", MainFrame)
@@ -130,12 +138,12 @@ local function createToggle(text, pos, key)
     updateVisual()
 end
 
-createToggle("WS PROTECTION", 310, "WS_Protection")
-createToggle("ANTI-STUN", 350, "AntiWeave")
-createToggle("SOLID SHELL", 390, "SolidToggle")
-createToggle("TP WALK (])", 430, "TPWalkEnabled")
-createToggle("SMART BOX", 470, "SmartBox")
-createToggle("STYLES PUNCH SPEED", 510, "PunchEnabled")
+createToggle("WS PROTECTION", 390, "WS_Protection")
+createToggle("ANTI-STUN", 430, "AntiWeave")
+createToggle("SOLID SHELL", 470, "SolidToggle")
+createToggle("TP WALK (])", 510, "TPWalkEnabled")
+createToggle("SMART BOX", 550, "SmartBox")
+createToggle("STYLES PUNCH SPEED", 590, "PunchEnabled")
 
 --------------------------------------------------
 -- CORE LOGIC
@@ -166,7 +174,6 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- PUNCH SPEED LOGIC
     if Settings.PunchEnabled and hum and hum:FindFirstChildOfClass("Animator") then
         for _, t in ipairs(hum:FindFirstChildOfClass("Animator"):GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
@@ -176,15 +183,12 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- IMPROVED HITBOX SYSTEM
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= LocalPlayer and v.Character then
             local root = v.Character:FindFirstChild("HumanoidRootPart")
             local vHum = v.Character:FindFirstChildOfClass("Humanoid")
             
-            -- Check if this specific player is our target
             local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
-            
             local currentSize = isTarget and Settings.Target_HRP_Size or Settings.HRP_Size
             local currentTrans = isTarget and Settings.Target_HRP_Trans or Settings.HRP_Trans
             
@@ -192,7 +196,7 @@ RunService.Heartbeat:Connect(function()
             if Settings.SmartBox then
                 shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
             else
-                shouldExpand = (currentSize > 2) 
+                shouldExpand = true -- Expand always if SmartBox is off
             end
 
             if root then
@@ -201,11 +205,11 @@ RunService.Heartbeat:Connect(function()
                     root.Transparency = currentTrans
                     root.CanCollide = false
                 else
-                    root.Size = Vector3.new(2, 2, 1)
-                    root.Transparency = 1
+                    -- OFF-STATE logic (instead of hardcoded 2, 2, 1)
+                    root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
+                    root.Transparency = Settings.Off_Trans
                 end
                 
-                -- Shell logic
                 local shell = root:FindFirstChild("SolidShell")
                 if Settings.SolidToggle and shouldExpand then
                     if not shell then
