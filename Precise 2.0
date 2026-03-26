@@ -7,24 +7,24 @@ local LocalPlayer = Players.LocalPlayer
 -- CONFIGURATION
 local Settings = {
     HRP_Size = 3,
-    HRP_Trans = 0.5,
+    HRP_Trans = 0.8,
+    TargetPlayer = "", 
+    Target_HRP_Size = 6, -- NEW: Specific size for your target
+    Target_HRP_Trans = 0.5, -- NEW: Specific transparency for your target
     SolidToggle = false,
     Solid_Size = 5,
     WalkSpeed = 11.5,        
     WS_Protection = true,  
     AntiWeave = true,
     TPWalkEnabled = false,
-    -- NEW SETTINGS
-    SmartBox = false, -- Master Toggle for Health/Knock Check
-    PunchEnabled = false,
+    SmartBox = false, 
+    PunchEnabled = false, 
     PunchSpeed = 1.7
 }
 
 local isTriggerHeld = false
 local TP_SPEED = 70
-local originalHRPProps = {}
 
--- PUNCH ANIMATION IDS
 local punchIDs = {
     ["rbxassetid://18312333191"] = true, ["rbxassetid://18312335714"] = true,
     ["rbxassetid://18312338197"] = true, ["rbxassetid://18312340119"] = true,
@@ -34,65 +34,93 @@ local punchIDs = {
 
 -- UI SETUP
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "PRECISE_2.0"
+ScreenGui.Name = "PRECISE_2.0_MODERN"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 560) 
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -280)
-MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.Size = UDim2.new(0, 320, 0, 620) -- Slightly taller for new options
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -310)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+MainFrame.BackgroundTransparency = 0.25
+MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 
+local UICorner = Instance.new("UICorner", MainFrame)
+UICorner.CornerRadius = UDim.new(0, 10)
+
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Text = "PRECISE 2.0"
-Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Size = UDim2.new(1, 0, 0, 45)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.SourceSansBold
+Title.Font = Enum.Font.GothamBold
 Title.TextSize = 20
 Title.BackgroundTransparency = 1
 
--- INPUT BOXES
-local function createSmartInput(text, pos, default, key)
+-- MODERN INPUT BOX FUNCTION
+local function createSmartInput(text, pos, default, key, isNumber)
     local lab = Instance.new("TextLabel", MainFrame)
-    lab.Position = UDim2.new(0, 15, 0, pos)
-    lab.Size = UDim2.new(0, 120, 0, 30)
+    lab.Position = UDim2.new(0, 20, 0, pos)
+    lab.Size = UDim2.new(0, 140, 0, 25)
     lab.Text = text
-    lab.TextColor3 = Color3.fromRGB(200, 200, 200)
+    lab.TextColor3 = Color3.fromRGB(220, 220, 220)
     lab.BackgroundTransparency = 1
+    lab.Font = Enum.Font.GothamSemibold
+    lab.TextSize = 13
     lab.TextXAlignment = Enum.TextXAlignment.Left
 
     local box = Instance.new("TextBox", MainFrame)
-    box.Size = UDim2.new(0, 100, 0, 25)
-    box.Position = UDim2.new(0, 180, 0, pos + 2)
+    box.Size = UDim2.new(0, 90, 0, 22)
+    box.Position = UDim2.new(0, 190, 0, pos + 2)
     box.Text = tostring(default)
-    box.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    box.PlaceholderText = "..."
+    box.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    box.BackgroundTransparency = 0.9
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
+    box.Font = Enum.Font.Gotham
+    box.TextSize = 12
+
+    local bCorner = Instance.new("UICorner", box)
+    bCorner.CornerRadius = UDim.new(0, 4)
 
     box.FocusLost:Connect(function()
-        Settings[key] = tonumber(box.Text:match("[%d%.]+")) or default
-        box.Text = tostring(Settings[key])
+        if isNumber then
+            Settings[key] = tonumber(box.Text:match("[%d%.]+")) or default
+            box.Text = tostring(Settings[key])
+        else
+            Settings[key] = box.Text
+        end
     end)
 end
 
-createSmartInput("Hitbox Size:", 50, Settings.HRP_Size, "HRP_Size")
-createSmartInput("Transparency:", 85, Settings.HRP_Trans, "HRP_Trans")
-createSmartInput("Walk Speed:", 120, Settings.WalkSpeed, "WalkSpeed")
-createSmartInput("Shell Size:", 155, Settings.Solid_Size, "Solid_Size")
-createSmartInput("Punch Speed:", 190, Settings.PunchSpeed, "PunchSpeed")
+-- TARGETING SECTION
+createSmartInput("Target User:", 50, Settings.TargetPlayer, "TargetPlayer", false)
+createSmartInput("Target Size:", 80, Settings.Target_HRP_Size, "Target_HRP_Size", true)
+createSmartInput("Target Trans:", 110, Settings.Target_HRP_Trans, "Target_HRP_Trans", true)
 
--- TOGGLE BUTTONS
+-- GLOBAL SECTION
+createSmartInput("Global Size:", 150, Settings.HRP_Size, "HRP_Size", true)
+createSmartInput("Global Trans:", 180, Settings.HRP_Trans, "HRP_Trans", true)
+createSmartInput("Walk Speed:", 210, Settings.WalkSpeed, "WalkSpeed", true)
+createSmartInput("Shell Size:", 240, Settings.Solid_Size, "Solid_Size", true)
+createSmartInput("Punch Speed:", 270, Settings.PunchSpeed, "PunchSpeed", true)
+
 local function createToggle(text, pos, key)
     local btn = Instance.new("TextButton", MainFrame)
     btn.Size = UDim2.new(0, 280, 0, 32)
-    btn.Position = UDim2.new(0, 15, 0, pos)
-    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 55)
+    btn.Position = UDim2.new(0, 20, 0, pos)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
+    btn.BackgroundTransparency = 0.5
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.Font = Enum.Font.SourceSansBold
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+
+    local btnCorner = Instance.new("UICorner", btn)
+    btnCorner.CornerRadius = UDim.new(0, 6)
 
     local function updateVisual()
         btn.Text = text .. ": " .. (Settings[key] and "ON" or "OFF")
-        btn.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 120, 200) or Color3.fromRGB(50, 50, 55)
+        btn.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 65)
     end
 
     btn.MouseButton1Click:Connect(function()
@@ -100,15 +128,14 @@ local function createToggle(text, pos, key)
         updateVisual()
     end)
     updateVisual()
-    return btn
 end
 
-createToggle("WS PROTECTION", 230, "WS_Protection")
-createToggle("ANTI-STUN", 270, "AntiWeave")
-createToggle("SOLID SHELL", 310, "SolidToggle")
-createToggle("TP WALK (])", 350, "TPWalkEnabled")
-createToggle("SMART BOX", 390, "SmartBox")
-createToggle("PUNCH SPEED", 430, "PunchEnabled")
+createToggle("WS PROTECTION", 310, "WS_Protection")
+createToggle("ANTI-STUN", 350, "AntiWeave")
+createToggle("SOLID SHELL", 390, "SolidToggle")
+createToggle("TP WALK (])", 430, "TPWalkEnabled")
+createToggle("SMART BOX", 470, "SmartBox")
+createToggle("STYLES PUNCH SPEED", 510, "PunchEnabled")
 
 --------------------------------------------------
 -- CORE LOGIC
@@ -121,75 +148,64 @@ local function getKnockedBool(p)
     return knocked and knocked:IsA("BoolValue") and knocked.Value or false
 end
 
-local function applyPunchSpeed()
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    local anim = hum and hum:FindFirstChildOfClass("Animator")
-    
-    if anim then
-        for _, t in ipairs(anim:GetPlayingAnimationTracks()) do
-            if t.Animation and punchIDs[tostring(t.Animation.AnimationId):lower()] then
-                pcall(function() 
-                    t:AdjustSpeed(Settings.PunchEnabled and Settings.PunchSpeed or 1) 
-                end)
-            end
-        end
-    end
-end
-
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
     
-    -- Movement & Anti-Stun
     if hum then
-        if hum.MoveDirection.Magnitude > 0 and (not Settings.WS_Protection or not isTriggerHeld) then
-            if hum.WalkSpeed ~= targetSpeed then hum.WalkSpeed = targetSpeed end
+        if (not Settings.WS_Protection or not isTriggerHeld) then
+            hum.WalkSpeed = targetSpeed
         end
         if Settings.AntiWeave then
-            local live = workspace:FindFirstChild("Live")
-            local playerChar = (live and live:FindFirstChild(LocalPlayer.Name)) or char
-            local stun = playerChar and playerChar:FindFirstChild("WeaveStun")
-            if stun then pcall(function() stun:Destroy() end) end
+            for _, child in ipairs(char:GetChildren()) do
+                if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then
+                    child:Destroy()
+                end
+            end
         end
     end
 
-    applyPunchSpeed()
+    -- PUNCH SPEED LOGIC
+    if Settings.PunchEnabled and hum and hum:FindFirstChildOfClass("Animator") then
+        for _, t in ipairs(hum:FindFirstChildOfClass("Animator"):GetPlayingAnimationTracks()) do
+            local id = tostring(t.Animation.AnimationId):lower()
+            if t.Name:match("^[1-4]$") or punchIDs[id] then
+                pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end)
+            end
+        end
+    end
 
-    -- HITBOX SYSTEM
+    -- IMPROVED HITBOX SYSTEM
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= LocalPlayer and v.Character then
             local root = v.Character:FindFirstChild("HumanoidRootPart")
             local vHum = v.Character:FindFirstChildOfClass("Humanoid")
             
-            -- HITBOX LOGIC SEPARATION
-            local shouldExpand = false
+            -- Check if this specific player is our target
+            local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
             
+            local currentSize = isTarget and Settings.Target_HRP_Size or Settings.HRP_Size
+            local currentTrans = isTarget and Settings.Target_HRP_Trans or Settings.HRP_Trans
+            
+            local shouldExpand = false
             if Settings.SmartBox then
-                -- Smart Logic: Only Expand if Alive and Not Knocked
-                if vHum and vHum.Health > 0 and not getKnockedBool(v) then
-                    shouldExpand = true
-                else
-                    shouldExpand = false
-                end
+                shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
             else
-                -- Regular Logic: Always Expand if there's a size value
-                shouldExpand = (Settings.HRP_Size > 2) 
+                shouldExpand = (currentSize > 2) 
             end
 
             if root then
                 if shouldExpand then
-                    root.Size = Vector3.new(Settings.HRP_Size, Settings.HRP_Size, Settings.HRP_Size)
-                    root.Transparency = Settings.HRP_Trans
+                    root.Size = Vector3.new(currentSize, currentSize, currentSize)
+                    root.Transparency = currentTrans
                     root.CanCollide = false
                 else
-                    -- Return to default hitbox size (standard is 2, 2, 1)
                     root.Size = Vector3.new(2, 2, 1)
                     root.Transparency = 1
                 end
                 
-                -- Shell Logic
+                -- Shell logic
                 local shell = root:FindFirstChild("SolidShell")
                 if Settings.SolidToggle and shouldExpand then
                     if not shell then
@@ -207,7 +223,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- INPUTS
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = true end
