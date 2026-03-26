@@ -11,20 +11,24 @@ local Settings = {
     TargetPlayer = "", 
     Target_HRP_Size = 6, 
     Target_HRP_Trans = 0.5,
-    Off_Size = 2, -- NEW: Adjustable size for when SmartBox is 'Off' (Knocked/Dead)
-    Off_Trans = 1, -- NEW: Adjustable transparency for 'Off' state
+    Stomp_HRP_Size = 8, -- ADDON: Stomp Hitbox Size
+    Stomp_HRP_Trans = 0.7, -- ADDON: Stomp Hitbox Transparency
+    Off_Size = 2, 
+    Off_Trans = 1, 
     SolidToggle = false,
     Solid_Size = 5,
-    WalkSpeed = 11.5,         
+    WalkSpeed = 11.5,          
     WS_Protection = true,  
     AntiWeave = true,
     TPWalkEnabled = false,
     SmartBox = false, 
     PunchEnabled = false, 
-    PunchSpeed = 1.7
+    PunchSpeed = 1.7,
+    StompSpeed = 1.0 -- ADDON: Stomp Animation Speed
 }
 
 local isTriggerHeld = false
+local isStomping = false -- ADDON: State tracker
 local TP_SPEED = 70
 
 local punchIDs = {
@@ -34,14 +38,19 @@ local punchIDs = {
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
 
--- UI SETUP (Original Style)
+local stompIDs = {
+    ["rbxassetid://17837722603"] = true,
+    ["rbxassetid://18362264385"] = true,
+}
+
+-- UI SETUP
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
 ScreenGui.Name = "PRECISE_2.0_MODERN"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 640) -- Adjusted height for new inputs
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -320)
+MainFrame.Size = UDim2.new(0, 320, 0, 720) -- Height increased for stomp addons
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -360)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 MainFrame.BackgroundTransparency = 0.25
 MainFrame.BorderSizePixel = 0
@@ -59,7 +68,6 @@ Title.Font = Enum.Font.GothamBold
 Title.TextSize = 20
 Title.BackgroundTransparency = 1
 
--- MODERN INPUT BOX FUNCTION
 local function createSmartInput(text, pos, default, key, isNumber)
     local lab = Instance.new("TextLabel", MainFrame)
     lab.Position = UDim2.new(0, 20, 0, pos)
@@ -95,23 +103,19 @@ local function createSmartInput(text, pos, default, key, isNumber)
     end)
 end
 
--- TARGETING SECTION
+-- UI INPUTS
 createSmartInput("Target User:", 50, Settings.TargetPlayer, "TargetPlayer", false)
 createSmartInput("Target Size:", 80, Settings.Target_HRP_Size, "Target_HRP_Size", true)
 createSmartInput("Target Trans:", 110, Settings.Target_HRP_Trans, "Target_HRP_Trans", true)
-
--- GLOBAL SECTION
 createSmartInput("Global Size:", 150, Settings.HRP_Size, "HRP_Size", true)
 createSmartInput("Global Trans:", 180, Settings.HRP_Trans, "HRP_Trans", true)
-
--- OFF-STATE SECTION (NEW)
 createSmartInput("Off-State Size:", 220, Settings.Off_Size, "Off_Size", true)
 createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
-
--- MISC SECTION
-createSmartInput("Walk Speed:", 290, Settings.WalkSpeed, "WalkSpeed", true)
-createSmartInput("Shell Size:", 320, Settings.Solid_Size, "Solid_Size", true)
-createSmartInput("Punch Speed:", 350, Settings.PunchSpeed, "PunchSpeed", true)
+createSmartInput("Stomp HRP Size:", 290, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
+createSmartInput("Stomp HRP Trans:", 320, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
+createSmartInput("Walk Speed:", 360, Settings.WalkSpeed, "WalkSpeed", true)
+createSmartInput("Punch Speed:", 390, Settings.PunchSpeed, "PunchSpeed", true)
+createSmartInput("Stomp Speed:", 420, Settings.StompSpeed, "StompSpeed", true)
 
 local function createToggle(text, pos, key)
     local btn = Instance.new("TextButton", MainFrame)
@@ -122,7 +126,6 @@ local function createToggle(text, pos, key)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 12
-
     local btnCorner = Instance.new("UICorner", btn)
     btnCorner.CornerRadius = UDim.new(0, 6)
 
@@ -130,20 +133,16 @@ local function createToggle(text, pos, key)
         btn.Text = text .. ": " .. (Settings[key] and "ON" or "OFF")
         btn.BackgroundColor3 = Settings[key] and Color3.fromRGB(0, 170, 255) or Color3.fromRGB(60, 60, 65)
     end
-
-    btn.MouseButton1Click:Connect(function()
-        Settings[key] = not Settings[key]
-        updateVisual()
-    end)
+    btn.MouseButton1Click:Connect(function() Settings[key] = not Settings[key] updateVisual() end)
     updateVisual()
 end
 
-createToggle("WS PROTECTION", 390, "WS_Protection")
-createToggle("ANTI-STUN", 430, "AntiWeave")
-createToggle("SOLID SHELL", 470, "SolidToggle")
-createToggle("TP WALK (])", 510, "TPWalkEnabled")
-createToggle("SMART BOX", 550, "SmartBox")
-createToggle("STYLES PUNCH SPEED", 590, "PunchEnabled")
+createToggle("WS PROTECTION", 460, "WS_Protection")
+createToggle("ANTI-STUN", 500, "AntiWeave")
+createToggle("SOLID SHELL", 540, "SolidToggle")
+createToggle("TP WALK (])", 580, "TPWalkEnabled")
+createToggle("SMART BOX", 620, "SmartBox")
+createToggle("STYLES PUNCH SPEED", 660, "PunchEnabled")
 
 --------------------------------------------------
 -- CORE LOGIC
@@ -159,6 +158,7 @@ end
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local animator = hum and hum:FindFirstChildOfClass("Animator")
     local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
     
     if hum then
@@ -167,21 +167,25 @@ RunService.Heartbeat:Connect(function()
         end
         if Settings.AntiWeave then
             for _, child in ipairs(char:GetChildren()) do
-                if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then
-                    child:Destroy()
-                end
+                if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then child:Destroy() end
             end
         end
     end
 
-    if Settings.PunchEnabled and hum and hum:FindFirstChildOfClass("Animator") then
-        for _, t in ipairs(hum:FindFirstChildOfClass("Animator"):GetPlayingAnimationTracks()) do
+    -- STOMP & PUNCH DETECTION
+    local foundStomp = false
+    if Settings.PunchEnabled and animator then
+        for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
-            if t.Name:match("^[1-4]$") or punchIDs[id] then
+            if stompIDs[id] then
+                foundStomp = true
+                pcall(function() t:AdjustSpeed(Settings.StompSpeed) end)
+            elseif t.Name:match("^[1-4]$") or punchIDs[id] then
                 pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end)
             end
         end
     end
+    isStomping = foundStomp
 
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= LocalPlayer and v.Character then
@@ -189,14 +193,25 @@ RunService.Heartbeat:Connect(function()
             local vHum = v.Character:FindFirstChildOfClass("Humanoid")
             
             local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
-            local currentSize = isTarget and Settings.Target_HRP_Size or Settings.HRP_Size
-            local currentTrans = isTarget and Settings.Target_HRP_Trans or Settings.HRP_Trans
+            
+            -- Size Logic Priority: Stomp > Target > Global
+            local currentSize, currentTrans
+            if isStomping then
+                currentSize = Settings.Stomp_HRP_Size
+                currentTrans = Settings.Stomp_HRP_Trans
+            elseif isTarget then
+                currentSize = Settings.Target_HRP_Size
+                currentTrans = Settings.Target_HRP_Trans
+            else
+                currentSize = Settings.HRP_Size
+                currentTrans = Settings.HRP_Trans
+            end
             
             local shouldExpand = false
             if Settings.SmartBox then
                 shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
             else
-                shouldExpand = true -- Expand always if SmartBox is off
+                shouldExpand = true 
             end
 
             if root then
@@ -205,7 +220,6 @@ RunService.Heartbeat:Connect(function()
                     root.Transparency = currentTrans
                     root.CanCollide = false
                 else
-                    -- OFF-STATE logic (instead of hardcoded 2, 2, 1)
                     root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
                     root.Transparency = Settings.Off_Trans
                 end
