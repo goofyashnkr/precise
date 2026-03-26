@@ -11,8 +11,8 @@ local Settings = {
     TargetPlayer = "", 
     Target_HRP_Size = 6, 
     Target_HRP_Trans = 0.5,
-    Stomp_HRP_Size = 8, -- Size when stomping
-    Stomp_HRP_Trans = 0.7, 
+    Stomp_HRP_Size = 8, -- ADDON: Stomp Hitbox Size
+    Stomp_HRP_Trans = 0.7, -- ADDON: Stomp Hitbox Transparency
     Off_Size = 2, 
     Off_Trans = 1, 
     SolidToggle = false,
@@ -24,11 +24,11 @@ local Settings = {
     SmartBox = false, 
     PunchEnabled = false, 
     PunchSpeed = 1.7,
-    StompSpeed = 1.0 
+    StompSpeed = 1.0 -- ADDON: Stomp Animation Speed
 }
 
 local isTriggerHeld = false
-local isStomping = false 
+local isStomping = false -- ADDON: State tracker
 local TP_SPEED = 70
 
 local punchIDs = {
@@ -38,7 +38,6 @@ local punchIDs = {
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
 
--- ONLY THESE IDS TRIGGER THE STOMP EXPANSION
 local stompIDs = {
     ["rbxassetid://17837722603"] = true,
     ["rbxassetid://18362264385"] = true,
@@ -175,13 +174,13 @@ RunService.Heartbeat:Connect(function()
 
     -- STOMP & PUNCH DETECTION
     local foundStomp = false
-    if Settings.PunchEnabled and animator then
+    if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
             if stompIDs[id] then
                 foundStomp = true
                 pcall(function() t:AdjustSpeed(Settings.StompSpeed) end)
-            elseif t.Name:match("^[1-4]$") or punchIDs[id] then
+            elseif Settings.PunchEnabled and (t.Name:match("^[1-4]$") or punchIDs[id]) then
                 pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end)
             end
         end
@@ -192,44 +191,37 @@ RunService.Heartbeat:Connect(function()
         if v ~= LocalPlayer and v.Character then
             local root = v.Character:FindFirstChild("HumanoidRootPart")
             local vHum = v.Character:FindFirstChildOfClass("Humanoid")
-            
             local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
             
-            -- Size Logic Priority: Stomp > Target > Global
-            local currentSize, currentTrans
-            if isStomping then
-                currentSize = Settings.Stomp_HRP_Size
-                currentTrans = Settings.Stomp_HRP_Trans
-            elseif isTarget then
-                currentSize = Settings.Target_HRP_Size
-                currentTrans = Settings.Target_HRP_Trans
-            else
-                currentSize = Settings.HRP_Size
-                currentTrans = Settings.HRP_Trans
-            end
-            
-            -- Expansion Logic: Always expand if currently stomping (ignores SmartBox/Knocked)
-            local shouldExpand = false
-            if isStomping then
-                shouldExpand = true 
-            elseif Settings.SmartBox then
-                shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
-            else
-                shouldExpand = true 
-            end
-
             if root then
-                if shouldExpand then
-                    root.Size = Vector3.new(currentSize, currentSize, currentSize)
-                    root.Transparency = currentTrans
+                if isStomping then
+                    -- OVERRIDE: Stomp always forces expansion regardless of SmartBox or Target
+                    root.Size = Vector3.new(Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Size)
+                    root.Transparency = Settings.Stomp_HRP_Trans
                     root.CanCollide = false
                 else
-                    root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
-                    root.Transparency = Settings.Off_Trans
+                    -- NORMAL LOGIC: Respect SmartBox
+                    local shouldExpand = true
+                    if Settings.SmartBox then
+                        shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
+                    end
+
+                    if shouldExpand then
+                        local size = isTarget and Settings.Target_HRP_Size or Settings.HRP_Size
+                        local trans = isTarget and Settings.Target_HRP_Trans or Settings.HRP_Trans
+                        
+                        root.Size = Vector3.new(size, size, size)
+                        root.Transparency = trans
+                        root.CanCollide = false
+                    else
+                        root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
+                        root.Transparency = Settings.Off_Trans
+                    end
                 end
                 
+                -- SOLID SHELL LOGIC
                 local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and shouldExpand then
+                if Settings.SolidToggle and (isStomping or (vHum and vHum.Health > 0 and not getKnockedBool(v))) then
                     if not shell then
                         shell = Instance.new("Part", root)
                         shell.Name = "SolidShell"
