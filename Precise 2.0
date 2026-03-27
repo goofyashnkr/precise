@@ -156,7 +156,7 @@ local function createToggle(text, pos, key)
     updateVisual()
 end
 
-createToggle("AI BOX (P1-P4)", 590, "AI_Box_Enabled")
+createToggle("AI BOX", 590, "AI_Box_Enabled")
 createToggle("WS PROTECTION", 630, "WS_Protection")
 createToggle("ANTI-STUN", 670, "AntiWeave")
 createToggle("SOLID SHELL", 710, "SolidToggle")
