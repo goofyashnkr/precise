@@ -11,11 +11,12 @@ local Settings = {
     TargetPlayer = "", 
     Target_HRP_Size = 6, 
     Target_HRP_Trans = 0.5,
-    Stomp_HRP_Size = 8, -- ADDON: Stomp Hitbox Size
-    Stomp_HRP_Trans = 0.7, -- ADDON: Stomp Hitbox Transparency
+    Stomp_HRP_Size = 8,
+    Stomp_HRP_Trans = 0.7,
     
     -- AI BOX ADDON SETTINGS
     AI_Box_Enabled = false,
+    AI_Box_Trans = 0.5, -- NEW: Overall transparency for AI Box P1-P4
     P1_Size = 6,
     P2_Size = 7,
     P3_Size = 8,
@@ -32,13 +33,14 @@ local Settings = {
     SmartBox = false, 
     PunchEnabled = false, 
     PunchSpeed = 1.7,
-    StompSpeed = 1.0 -- ADDON: Stomp Animation Speed
+    StompSpeed = 1.0
 }
 
 local isTriggerHeld = false
 local isStomping = false 
-local activePunchType = nil -- Tracks P1, P2, P3, or P4
+local activePunchType = nil 
 local TP_SPEED = 70
+local LIMIT_DISTANCE = 35 -- UPDATED: Stud limit for Stomp/AI Box
 
 -- ID Mapping for AI Box
 local punchIDs = {
@@ -125,14 +127,15 @@ createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
 createSmartInput("Stomp HRP Size:", 290, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
 createSmartInput("Stomp HRP Trans:", 320, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
 
-createSmartInput("P1 SIZE:", 360, Settings.P1_Size, "P1_Size", true)
-createSmartInput("P2 SIZE:", 390, Settings.P2_Size, "P2_Size", true)
-createSmartInput("P3 SIZE:", 420, Settings.P3_Size, "P3_Size", true)
-createSmartInput("P4 SIZE:", 450, Settings.P4_Size, "P4_Size", true)
+createSmartInput("AI BOX Trans:", 350, Settings.AI_Box_Trans, "AI_Box_Trans", true) -- NEW UI ELEMENT
+createSmartInput("P1 SIZE:", 380, Settings.P1_Size, "P1_Size", true)
+createSmartInput("P2 SIZE:", 410, Settings.P2_Size, "P2_Size", true)
+createSmartInput("P3 SIZE:", 440, Settings.P3_Size, "P3_Size", true)
+createSmartInput("P4 SIZE:", 470, Settings.P4_Size, "P4_Size", true)
 
-createSmartInput("Walk Speed:", 490, Settings.WalkSpeed, "WalkSpeed", true)
-createSmartInput("Punch Speed:", 520, Settings.PunchSpeed, "PunchSpeed", true)
-createSmartInput("Stomp Speed:", 550, Settings.StompSpeed, "StompSpeed", true)
+createSmartInput("Walk Speed:", 510, Settings.WalkSpeed, "WalkSpeed", true)
+createSmartInput("Punch Speed:", 540, Settings.PunchSpeed, "PunchSpeed", true)
+createSmartInput("Stomp Speed:", 570, Settings.StompSpeed, "StompSpeed", true)
 
 local function createToggle(text, pos, key)
     local btn = Instance.new("TextButton", MainFrame)
@@ -154,13 +157,13 @@ local function createToggle(text, pos, key)
     updateVisual()
 end
 
-createToggle("AI BOX", 590, "AI_Box_Enabled")
-createToggle("WS PROTECTION", 630, "WS_Protection")
-createToggle("ANTI-STUN", 670, "AntiWeave")
-createToggle("SOLID SHELL", 710, "SolidToggle")
-createToggle("TP WALK (])", 750, "TPWalkEnabled")
-createToggle("SMART BOX", 790, "SmartBox")
-createToggle("STYLES PUNCH SPEED", 830, "PunchEnabled")
+createToggle("AI BOX", 610, "AI_Box_Enabled")
+createToggle("WS PROTECTION", 650, "WS_Protection")
+createToggle("ANTI-STUN", 690, "AntiWeave")
+createToggle("SOLID SHELL", 730, "SolidToggle")
+createToggle("TP WALK (])", 770, "TPWalkEnabled")
+createToggle("SMART BOX", 810, "SmartBox")
+createToggle("STYLES PUNCH SPEED", 850, "PunchEnabled")
 
 --------------------------------------------------
 -- CORE LOGIC
@@ -216,40 +219,36 @@ RunService.Heartbeat:Connect(function()
             local vHum = v.Character:FindFirstChildOfClass("Humanoid")
             
             if root then
-                -- DISTANCE CHECK
                 local distance = (myRoot.Position - root.Position).Magnitude
-                local isWithinRange = (distance <= 20)
+                local isWithinLimit = (distance <= LIMIT_DISTANCE) -- 35 Studs
                 
                 local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
                 
-                -- SIZE LOGIC PRIORITY: Stomp > AI Box > Target > Global
                 local currentSize, currentTrans
-                
-                if isStomping and isWithinRange then
+                local forceOff = false
+
+                -- LOGIC: Limit only applies to Stomp and AI Box
+                if isStomping and isWithinLimit then
                     currentSize = Settings.Stomp_HRP_Size
                     currentTrans = Settings.Stomp_HRP_Trans
-                elseif Settings.AI_Box_Enabled and activePunchType and isWithinRange then
+                elseif Settings.AI_Box_Enabled and activePunchType and isWithinLimit then
                     currentSize = Settings[activePunchType.."_Size"] or Settings.HRP_Size
-                    currentTrans = Settings.Target_HRP_Trans 
+                    currentTrans = Settings.AI_Box_Trans -- UPDATED: Uses AI Box specific trans
                 elseif isTarget then
                     currentSize = Settings.Target_HRP_Size
                     currentTrans = Settings.Target_HRP_Trans
                 else
+                    -- Global/Normal Expansion (No distance limit)
                     currentSize = Settings.HRP_Size
                     currentTrans = Settings.HRP_Trans
                 end
                 
-                local shouldExpand = false
+                local shouldExpand = true
                 if Settings.SmartBox then
                     shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
-                else
-                    shouldExpand = true 
                 end
 
-                -- Final Condition: Must be alive/valid AND within 20 studs for Hitbox/AI Box
-                local finalExpand = shouldExpand and isWithinRange
-
-                if finalExpand then
+                if shouldExpand then
                     root.Size = Vector3.new(currentSize, currentSize, currentSize)
                     root.Transparency = currentTrans
                     root.CanCollide = false
@@ -259,7 +258,7 @@ RunService.Heartbeat:Connect(function()
                 end
                 
                 local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and finalExpand then
+                if Settings.SolidToggle and shouldExpand then
                     if not shell then
                         shell = Instance.new("Part", root)
                         shell.Name = "SolidShell"
