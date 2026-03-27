@@ -16,7 +16,7 @@ local Settings = {
     
     -- AI BOX ADDON SETTINGS
     AI_Box_Enabled = false,
-    AI_Box_Trans = 0.5, -- NEW: Overall transparency for AI Box P1-P4
+    AI_Box_Trans = 0.5, 
     P1_Size = 6,
     P2_Size = 7,
     P3_Size = 8,
@@ -40,33 +40,27 @@ local isTriggerHeld = false
 local isStomping = false 
 local activePunchType = nil 
 local TP_SPEED = 70
-local LIMIT_DISTANCE = 35 -- UPDATED: Stud limit for Stomp/AI Box
+local LIMIT_DISTANCE = 35 -- 35 Stud Limit for AI Box/Stomp
 
--- ID Mapping for AI Box
+-- ID Mapping
 local punchIDs = {
-    ["rbxassetid://18312333191"] = "P1", 
-    ["rbxassetid://18312335714"] = "P2",
-    ["rbxassetid://18312338197"] = "P3", 
-    ["rbxassetid://18312340119"] = "P4",
+    ["rbxassetid://18312333191"] = "P1", ["rbxassetid://18312335714"] = "P2",
+    ["rbxassetid://18312338197"] = "P3", ["rbxassetid://18312340119"] = "P4",
     ["rbxassetid://18312344029"] = true, ["rbxassetid://18312346524"] = true,
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
-
-local stompIDs = {
-    ["rbxassetid://17837722603"] = true,
-    ["rbxassetid://18362264385"] = true,
-}
+local stompIDs = { ["rbxassetid://17837722603"] = true, ["rbxassetid://18362264385"] = true }
 
 -- UI SETUP
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "PRECISE_2.0_MODERN"
+ScreenGui.Name = "PRECISE_2.0_SPACED"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 950) 
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -475)
+MainFrame.Size = UDim2.new(0, 320, 0, 1050) -- Taller Frame for Spacing
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -525)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-MainFrame.BackgroundTransparency = 0.25
+MainFrame.BackgroundTransparency = 0.2
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
@@ -76,10 +70,10 @@ UICorner.CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Text = "PRECISE 2.0"
-Title.Size = UDim2.new(1, 0, 0, 45)
+Title.Size = UDim2.new(1, 0, 0, 60)
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 20
+Title.TextSize = 22
 Title.BackgroundTransparency = 1
 
 local function createSmartInput(text, pos, default, key, isNumber)
@@ -94,10 +88,9 @@ local function createSmartInput(text, pos, default, key, isNumber)
     lab.TextXAlignment = Enum.TextXAlignment.Left
 
     local box = Instance.new("TextBox", MainFrame)
-    box.Size = UDim2.new(0, 90, 0, 22)
-    box.Position = UDim2.new(0, 190, 0, pos + 2)
+    box.Size = UDim2.new(0, 90, 0, 25)
+    box.Position = UDim2.new(0, 190, 0, pos)
     box.Text = tostring(default)
-    box.PlaceholderText = "..."
     box.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     box.BackgroundTransparency = 0.9
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -117,29 +110,36 @@ local function createSmartInput(text, pos, default, key, isNumber)
     end)
 end
 
-createSmartInput("Target User:", 50, Settings.TargetPlayer, "TargetPlayer", false)
-createSmartInput("Target Size:", 80, Settings.Target_HRP_Size, "Target_HRP_Size", true)
-createSmartInput("Target Trans:", 110, Settings.Target_HRP_Trans, "Target_HRP_Trans", true)
-createSmartInput("Global Size:", 150, Settings.HRP_Size, "HRP_Size", true)
-createSmartInput("Global Trans:", 180, Settings.HRP_Trans, "HRP_Trans", true)
-createSmartInput("Off-State Size:", 220, Settings.Off_Size, "Off_Size", true)
-createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
-createSmartInput("Stomp HRP Size:", 290, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
-createSmartInput("Stomp HRP Trans:", 320, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
+-- TARGET SECTION
+createSmartInput("Target User:", 70, Settings.TargetPlayer, "TargetPlayer", false)
+createSmartInput("Target Size:", 110, Settings.Target_HRP_Size, "Target_HRP_Size", true)
+createSmartInput("Target Trans:", 150, Settings.Target_HRP_Trans, "Target_HRP_Trans", true)
 
-createSmartInput("AI BOX Trans:", 350, Settings.AI_Box_Trans, "AI_Box_Trans", true) -- NEW UI ELEMENT
-createSmartInput("P1 SIZE:", 380, Settings.P1_Size, "P1_Size", true)
-createSmartInput("P2 SIZE:", 410, Settings.P2_Size, "P2_Size", true)
-createSmartInput("P3 SIZE:", 440, Settings.P3_Size, "P3_Size", true)
-createSmartInput("P4 SIZE:", 470, Settings.P4_Size, "P4_Size", true)
+-- GLOBAL SECTION
+createSmartInput("Global Size:", 200, Settings.HRP_Size, "HRP_Size", true)
+createSmartInput("Global Trans:", 240, Settings.HRP_Trans, "HRP_Trans", true)
+createSmartInput("Off-State Size:", 280, Settings.Off_Size, "Off_Size", true)
+createSmartInput("Off-State Trans:", 320, Settings.Off_Trans, "Off_Trans", true)
 
-createSmartInput("Walk Speed:", 510, Settings.WalkSpeed, "WalkSpeed", true)
-createSmartInput("Punch Speed:", 540, Settings.PunchSpeed, "PunchSpeed", true)
-createSmartInput("Stomp Speed:", 570, Settings.StompSpeed, "StompSpeed", true)
+-- STOMP SECTION
+createSmartInput("Stomp HRP Size:", 370, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
+createSmartInput("Stomp HRP Trans:", 410, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
+
+-- AI BOX SECTION
+createSmartInput("AI BOX Trans:", 460, Settings.AI_Box_Trans, "AI_Box_Trans", true)
+createSmartInput("P1 SIZE:", 500, Settings.P1_Size, "P1_Size", true)
+createSmartInput("P2 SIZE:", 540, Settings.P2_Size, "P2_Size", true)
+createSmartInput("P3 SIZE:", 580, Settings.P3_Size, "P3_Size", true)
+createSmartInput("P4 SIZE:", 620, Settings.P4_Size, "P4_Size", true)
+
+-- MOVEMENT/SPEED SECTION
+createSmartInput("Walk Speed:", 670, Settings.WalkSpeed, "WalkSpeed", true)
+createSmartInput("Punch Speed:", 710, Settings.PunchSpeed, "PunchSpeed", true)
+createSmartInput("Stomp Speed:", 750, Settings.StompSpeed, "StompSpeed", true)
 
 local function createToggle(text, pos, key)
     local btn = Instance.new("TextButton", MainFrame)
-    btn.Size = UDim2.new(0, 280, 0, 32)
+    btn.Size = UDim2.new(0, 280, 0, 35)
     btn.Position = UDim2.new(0, 20, 0, pos)
     btn.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
     btn.BackgroundTransparency = 0.5
@@ -157,13 +157,12 @@ local function createToggle(text, pos, key)
     updateVisual()
 end
 
-createToggle("AI BOX", 610, "AI_Box_Enabled")
-createToggle("WS PROTECTION", 650, "WS_Protection")
-createToggle("ANTI-STUN", 690, "AntiWeave")
-createToggle("SOLID SHELL", 730, "SolidToggle")
-createToggle("TP WALK (])", 770, "TPWalkEnabled")
-createToggle("SMART BOX", 810, "SmartBox")
-createToggle("STYLES PUNCH SPEED", 850, "PunchEnabled")
+-- TOGGLES
+createToggle("AI BOX", 810, "AI_Box_Enabled")
+createToggle("WS PROTECTION", 855, "WS_Protection")
+createToggle("ANTI-STUN", 900, "AntiWeave")
+createToggle("SOLID SHELL", 945, "SolidToggle")
+createToggle("TP WALK (])", 990, "TPWalkEnabled")
 
 --------------------------------------------------
 -- CORE LOGIC
@@ -184,9 +183,7 @@ RunService.Heartbeat:Connect(function()
     local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
     
     if hum then
-        if (not Settings.WS_Protection or not isTriggerHeld) then
-            hum.WalkSpeed = targetSpeed
-        end
+        if (not Settings.WS_Protection or not isTriggerHeld) then hum.WalkSpeed = targetSpeed end
         if Settings.AntiWeave then
             for _, child in ipairs(char:GetChildren()) do
                 if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then child:Destroy() end
@@ -206,8 +203,6 @@ RunService.Heartbeat:Connect(function()
             elseif punchIDs[id] then
                 if typeof(punchIDs[id]) == "string" then activePunchType = punchIDs[id] end
                 if Settings.PunchEnabled then pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end) end
-            elseif t.Name:match("^[1-4]$") and Settings.PunchEnabled then
-                pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end)
             end
         end
     end
@@ -216,37 +211,29 @@ RunService.Heartbeat:Connect(function()
     for _, v in pairs(Players:GetPlayers()) do
         if v ~= LocalPlayer and v.Character and myRoot then
             local root = v.Character:FindFirstChild("HumanoidRootPart")
-            local vHum = v.Character:FindFirstChildOfClass("Humanoid")
-            
             if root then
                 local distance = (myRoot.Position - root.Position).Magnitude
-                local isWithinLimit = (distance <= LIMIT_DISTANCE) -- 35 Studs
-                
+                local isWithinLimit = (distance <= LIMIT_DISTANCE)
                 local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
                 
                 local currentSize, currentTrans
-                local forceOff = false
+                local isUsingSpecial = false
 
-                -- LOGIC: Limit only applies to Stomp and AI Box
+                -- Priority Logic with 35 Stud Limit on Special States
                 if isStomping and isWithinLimit then
-                    currentSize = Settings.Stomp_HRP_Size
-                    currentTrans = Settings.Stomp_HRP_Trans
+                    currentSize, currentTrans = Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Trans
+                    isUsingSpecial = true
                 elseif Settings.AI_Box_Enabled and activePunchType and isWithinLimit then
-                    currentSize = Settings[activePunchType.."_Size"] or Settings.HRP_Size
-                    currentTrans = Settings.AI_Box_Trans -- UPDATED: Uses AI Box specific trans
+                    currentSize, currentTrans = Settings[activePunchType.."_Size"] or Settings.HRP_Size, Settings.AI_Box_Trans
+                    isUsingSpecial = true
                 elseif isTarget then
-                    currentSize = Settings.Target_HRP_Size
-                    currentTrans = Settings.Target_HRP_Trans
+                    currentSize, currentTrans = Settings.Target_HRP_Size, Settings.Target_HRP_Trans
                 else
-                    -- Global/Normal Expansion (No distance limit)
-                    currentSize = Settings.HRP_Size
-                    currentTrans = Settings.HRP_Trans
+                    currentSize, currentTrans = Settings.HRP_Size, Settings.HRP_Trans
                 end
                 
                 local shouldExpand = true
-                if Settings.SmartBox then
-                    shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
-                end
+                if Settings.SmartBox then shouldExpand = (not getKnockedBool(v)) end
 
                 if shouldExpand then
                     root.Size = Vector3.new(currentSize, currentSize, currentSize)
@@ -256,19 +243,6 @@ RunService.Heartbeat:Connect(function()
                     root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
                     root.Transparency = Settings.Off_Trans
                 end
-                
-                local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and shouldExpand then
-                    if not shell then
-                        shell = Instance.new("Part", root)
-                        shell.Name = "SolidShell"
-                        shell.Transparency = 1
-                    end
-                    shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size)
-                    shell.CFrame = root.CFrame
-                elseif shell then
-                    shell:Destroy()
-                end
             end
         end
     end
@@ -276,11 +250,11 @@ end)
 
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = true end
-    if input.KeyCode == Enum.KeyCode.M or input.KeyCode == Enum.KeyCode.ButtonSelect then MainFrame.Visible = not MainFrame.Visible end
+    if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = true end
+    if input.KeyCode == Enum.KeyCode.M then MainFrame.Visible = not MainFrame.Visible end
     if input.KeyCode == Enum.KeyCode.RightBracket then Settings.TPWalkEnabled = not Settings.TPWalkEnabled end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = false end
+    if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = false end
 end)
