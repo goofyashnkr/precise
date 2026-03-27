@@ -13,6 +13,14 @@ local Settings = {
     Target_HRP_Trans = 0.5,
     Stomp_HRP_Size = 8, -- ADDON: Stomp Hitbox Size
     Stomp_HRP_Trans = 0.7, -- ADDON: Stomp Hitbox Transparency
+    
+    -- AI BOX ADDON SETTINGS
+    AI_Box_Enabled = false,
+    P1_Size = 6,
+    P2_Size = 7,
+    P3_Size = 8,
+    P4_Size = 10,
+    
     Off_Size = 2, 
     Off_Trans = 1, 
     SolidToggle = false,
@@ -29,11 +37,15 @@ local Settings = {
 
 local isTriggerHeld = false
 local isStomping = false 
+local activePunchType = nil -- Tracks P1, P2, P3, or P4
 local TP_SPEED = 70
 
+-- ID Mapping for AI Box
 local punchIDs = {
-    ["rbxassetid://18312333191"] = true, ["rbxassetid://18312335714"] = true,
-    ["rbxassetid://18312338197"] = true, ["rbxassetid://18312340119"] = true,
+    ["rbxassetid://18312333191"] = "P1", 
+    ["rbxassetid://18312335714"] = "P2",
+    ["rbxassetid://18312338197"] = "P3", 
+    ["rbxassetid://18312340119"] = "P4",
     ["rbxassetid://18312344029"] = true, ["rbxassetid://18312346524"] = true,
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
@@ -49,8 +61,8 @@ ScreenGui.Name = "PRECISE_2.0_MODERN"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 720) 
-MainFrame.Position = UDim2.new(0.5, -160, 0.5, -360)
+MainFrame.Size = UDim2.new(0, 320, 0, 950) -- Extended height to fit all original + new settings
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -475)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 MainFrame.BackgroundTransparency = 0.25
 MainFrame.BorderSizePixel = 0
@@ -103,7 +115,7 @@ local function createSmartInput(text, pos, default, key, isNumber)
     end)
 end
 
--- UI INPUTS
+-- UI INPUTS (Kept all original settings + added AI Box)
 createSmartInput("Target User:", 50, Settings.TargetPlayer, "TargetPlayer", false)
 createSmartInput("Target Size:", 80, Settings.Target_HRP_Size, "Target_HRP_Size", true)
 createSmartInput("Target Trans:", 110, Settings.Target_HRP_Trans, "Target_HRP_Trans", true)
@@ -113,9 +125,16 @@ createSmartInput("Off-State Size:", 220, Settings.Off_Size, "Off_Size", true)
 createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
 createSmartInput("Stomp HRP Size:", 290, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
 createSmartInput("Stomp HRP Trans:", 320, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
-createSmartInput("Walk Speed:", 360, Settings.WalkSpeed, "WalkSpeed", true)
-createSmartInput("Punch Speed:", 390, Settings.PunchSpeed, "PunchSpeed", true)
-createSmartInput("Stomp Speed:", 420, Settings.StompSpeed, "StompSpeed", true)
+
+-- AI BOX SPECIFIC INPUTS
+createSmartInput("P1 SIZE:", 360, Settings.P1_Size, "P1_Size", true)
+createSmartInput("P2 SIZE:", 390, Settings.P2_Size, "P2_Size", true)
+createSmartInput("P3 SIZE:", 420, Settings.P3_Size, "P3_Size", true)
+createSmartInput("P4 SIZE:", 450, Settings.P4_Size, "P4_Size", true)
+
+createSmartInput("Walk Speed:", 490, Settings.WalkSpeed, "WalkSpeed", true)
+createSmartInput("Punch Speed:", 520, Settings.PunchSpeed, "PunchSpeed", true)
+createSmartInput("Stomp Speed:", 550, Settings.StompSpeed, "StompSpeed", true)
 
 local function createToggle(text, pos, key)
     local btn = Instance.new("TextButton", MainFrame)
@@ -137,12 +156,13 @@ local function createToggle(text, pos, key)
     updateVisual()
 end
 
-createToggle("WS PROTECTION", 460, "WS_Protection")
-createToggle("ANTI-STUN", 500, "AntiWeave")
-createToggle("SOLID SHELL", 540, "SolidToggle")
-createToggle("TP WALK (])", 580, "TPWalkEnabled")
-createToggle("SMART BOX", 620, "SmartBox")
-createToggle("STYLES PUNCH SPEED", 660, "PunchEnabled")
+createToggle("AI BOX (P1-P4)", 590, "AI_Box_Enabled")
+createToggle("WS PROTECTION", 630, "WS_Protection")
+createToggle("ANTI-STUN", 670, "AntiWeave")
+createToggle("SOLID SHELL", 710, "SolidToggle")
+createToggle("TP WALK (])", 750, "TPWalkEnabled")
+createToggle("SMART BOX", 790, "SmartBox")
+createToggle("STYLES PUNCH SPEED", 830, "PunchEnabled")
 
 --------------------------------------------------
 -- CORE LOGIC
@@ -172,15 +192,20 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- ANIMATION DETECTION
+    -- STOMP & PUNCH DETECTION (Now includes AI Box types)
     local foundStomp = false
+    activePunchType = nil
+    
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
             if stompIDs[id] then
                 foundStomp = true
                 pcall(function() t:AdjustSpeed(Settings.StompSpeed) end)
-            elseif Settings.PunchEnabled and (t.Name:match("^[1-4]$") or punchIDs[id]) then
+            elseif punchIDs[id] then
+                if typeof(punchIDs[id]) == "string" then activePunchType = punchIDs[id] end
+                if Settings.PunchEnabled then pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end) end
+            elseif t.Name:match("^[1-4]$") and Settings.PunchEnabled then
                 pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end)
             end
         end
@@ -191,36 +216,45 @@ RunService.Heartbeat:Connect(function()
         if v ~= LocalPlayer and v.Character then
             local root = v.Character:FindFirstChild("HumanoidRootPart")
             local vHum = v.Character:FindFirstChildOfClass("Humanoid")
+            
             local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
             
+            -- SIZE LOGIC PRIORITY: Stomp > AI Box > Target > Global
+            local currentSize, currentTrans
+            
+            if isStomping then
+                currentSize = Settings.Stomp_HRP_Size
+                currentTrans = Settings.Stomp_HRP_Trans
+            elseif Settings.AI_Box_Enabled and activePunchType then
+                currentSize = Settings[activePunchType.."_Size"] or Settings.HRP_Size
+                currentTrans = Settings.Target_HRP_Trans -- Uses target trans for punch clarity
+            elseif isTarget then
+                currentSize = Settings.Target_HRP_Size
+                currentTrans = Settings.Target_HRP_Trans
+            else
+                currentSize = Settings.HRP_Size
+                currentTrans = Settings.HRP_Trans
+            end
+            
+            local shouldExpand = false
+            if Settings.SmartBox then
+                shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
+            else
+                shouldExpand = true 
+            end
+
             if root then
-                -- PRIORITY OVERRIDE: Stomp always wins
-                if isStomping then
-                    root.Size = Vector3.new(Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Size)
-                    root.Transparency = Settings.Stomp_HRP_Trans
+                if shouldExpand then
+                    root.Size = Vector3.new(currentSize, currentSize, currentSize)
+                    root.Transparency = currentTrans
                     root.CanCollide = false
                 else
-                    -- SMART BOX LOGIC: Only expands if player is alive/not knocked
-                    local allowedBySmartBox = true
-                    if Settings.SmartBox then
-                        allowedBySmartBox = (vHum and vHum.Health > 0 and not getKnockedBool(v))
-                    end
-
-                    if allowedBySmartBox then
-                        local size = isTarget and Settings.Target_HRP_Size or Settings.HRP_Size
-                        local trans = isTarget and Settings.Target_HRP_Trans or Settings.HRP_Trans
-                        root.Size = Vector3.new(size, size, size)
-                        root.Transparency = trans
-                        root.CanCollide = false
-                    else
-                        root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
-                        root.Transparency = Settings.Off_Trans
-                    end
+                    root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
+                    root.Transparency = Settings.Off_Trans
                 end
                 
-                -- SOLID SHELL
                 local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and (isStomping or (vHum and vHum.Health > 0 and not getKnockedBool(v))) then
+                if Settings.SolidToggle and shouldExpand then
                     if not shell then
                         shell = Instance.new("Part", root)
                         shell.Name = "SolidShell"
