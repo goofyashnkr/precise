@@ -4,7 +4,7 @@ local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
--- CONFIGURATION (Original OG Style)
+-- CONFIGURATION
 local Settings = {
     HRP_Size = 3,
     HRP_Trans = 0.8,
@@ -16,7 +16,7 @@ local Settings = {
     
     -- AI BOX ADDON SETTINGS
     AI_Box_Enabled = false,
-    AI_Box_Trans = 0.5, -- Added Transparency for AI Box
+    AI_Box_Trans = 0.5,
     P1_Size = 6,
     P2_Size = 7,
     P3_Size = 8,
@@ -40,9 +40,9 @@ local isTriggerHeld = false
 local isStomping = false 
 local activePunchType = nil 
 local TP_SPEED = 70
-local LIMIT_DISTANCE = 35 -- Restricted to Stomp/AI Box only
+local LIMIT_DISTANCE = 35 
 
--- ID Mapping
+-- Animation IDs
 local punchIDs = {
     ["rbxassetid://18312333191"] = "P1", ["rbxassetid://18312335714"] = "P2",
     ["rbxassetid://18312338197"] = "P3", ["rbxassetid://18312340119"] = "P4",
@@ -55,9 +55,9 @@ local stompIDs = {
     ["rbxassetid://18362264385"] = true,
 }
 
--- UI SETUP (OG COMPACT STYLE)
+-- UI SETUP (OG STYLE)
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "PRECISE_2.0_OG_REDUX"
+ScreenGui.Name = "PRECISE_2.0_OG"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
@@ -100,9 +100,7 @@ local function createSmartInput(text, pos, default, key, isNumber)
     box.TextColor3 = Color3.fromRGB(255, 255, 255)
     box.Font = Enum.Font.Gotham
     box.TextSize = 12
-
-    local bCorner = Instance.new("UICorner", box)
-    bCorner.CornerRadius = UDim.new(0, 4)
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
 
     box.FocusLost:Connect(function()
         if isNumber then
@@ -124,7 +122,7 @@ createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
 createSmartInput("Stomp HRP Size:", 290, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
 createSmartInput("Stomp HRP Trans:", 320, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
 
-createSmartInput("AI BOX TRANS:", 360, Settings.AI_Box_Trans, "AI_Box_Trans", true) -- NEW
+createSmartInput("AI BOX TRANS:", 360, Settings.AI_Box_Trans, "AI_Box_Trans", true)
 createSmartInput("P1 SIZE:", 390, Settings.P1_Size, "P1_Size", true)
 createSmartInput("P2 SIZE:", 420, Settings.P2_Size, "P2_Size", true)
 createSmartInput("P3 SIZE:", 450, Settings.P3_Size, "P3_Size", true)
@@ -143,8 +141,7 @@ local function createToggle(text, pos, key)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 12
-    local btnCorner = Instance.new("UICorner", btn)
-    btnCorner.CornerRadius = UDim.new(0, 6)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
 
     local function updateVisual()
         btn.Text = text .. ": " .. (Settings[key] and "ON" or "OFF")
@@ -178,9 +175,14 @@ RunService.Heartbeat:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
+    local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
     
     if hum then
-        hum.WalkSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
+        -- REVERTED: Original WalkSpeed Protection Logic
+        if (not Settings.WS_Protection or not isTriggerHeld) then
+            hum.WalkSpeed = targetSpeed
+        end
+        
         if Settings.AntiWeave then
             for _, child in ipairs(char:GetChildren()) do
                 if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then child:Destroy() end
@@ -214,8 +216,7 @@ RunService.Heartbeat:Connect(function()
                 
                 local currentSize, currentTrans
                 
-                -- PRIORITY LOGIC
-                -- Check Stomp/AI Box with 35 stud limit
+                -- Hitbox Logic with 35 Stud Limit on Specials
                 if isStomping and distance <= LIMIT_DISTANCE then
                     currentSize = Settings.Stomp_HRP_Size
                     currentTrans = Settings.Stomp_HRP_Trans
@@ -223,19 +224,15 @@ RunService.Heartbeat:Connect(function()
                     currentSize = Settings[activePunchType.."_Size"] or Settings.HRP_Size
                     currentTrans = Settings.AI_Box_Trans
                 elseif isTarget then
-                    -- Target size has no distance limit (as per original request)
                     currentSize = Settings.Target_HRP_Size
                     currentTrans = Settings.Target_HRP_Trans
                 else
-                    -- Global size has no distance limit
                     currentSize = Settings.HRP_Size
                     currentTrans = Settings.HRP_Trans
                 end
                 
                 local shouldExpand = true
-                if Settings.SmartBox then
-                    shouldExpand = (not getKnockedBool(v))
-                end
+                if Settings.SmartBox then shouldExpand = (not getKnockedBool(v)) end
 
                 if shouldExpand then
                     root.Size = Vector3.new(currentSize, currentSize, currentSize)
@@ -245,20 +242,6 @@ RunService.Heartbeat:Connect(function()
                     root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
                     root.Transparency = Settings.Off_Trans
                 end
-                
-                -- Solid Shell Logic
-                local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and shouldExpand then
-                    if not shell then
-                        shell = Instance.new("Part", root)
-                        shell.Name = "SolidShell"
-                        shell.Transparency = 1
-                    end
-                    shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size)
-                    shell.CFrame = root.CFrame
-                elseif shell then
-                    shell:Destroy()
-                end
             end
         end
     end
@@ -266,11 +249,11 @@ end)
 
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = true end
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = true end
     if input.KeyCode == Enum.KeyCode.M then MainFrame.Visible = not MainFrame.Visible end
     if input.KeyCode == Enum.KeyCode.RightBracket then Settings.TPWalkEnabled = not Settings.TPWalkEnabled end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = false end
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = false end
 end)
