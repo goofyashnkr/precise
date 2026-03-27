@@ -11,7 +11,7 @@ local Settings = {
     TargetPlayer = "", 
     Target_HRP_Size = 6, 
     Target_HRP_Trans = 0.5,
-    Stomp_HRP_Size = 8, 
+    Stomp_HRP_Size = 8,
     Stomp_HRP_Trans = 0.7,
     
     -- AI BOX & STYLES SETTINGS
@@ -40,11 +40,14 @@ local isTriggerHeld = false
 local isStomping = false 
 local activePunchType = nil 
 local TP_SPEED = 70
-local LIMIT_DISTANCE = 35 
+local LIMIT_DISTANCE = 35 -- Limitation for Stomp/AI Box
 
+-- ID Mapping
 local punchIDs = {
     ["rbxassetid://18312333191"] = "P1", ["rbxassetid://18312335714"] = "P2",
     ["rbxassetid://18312338197"] = "P3", ["rbxassetid://18312340119"] = "P4",
+    ["rbxassetid://18312344029"] = true, ["rbxassetid://18312346524"] = true,
+    ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
 local stompIDs = { ["rbxassetid://17837722603"] = true, ["rbxassetid://18362264385"] = true }
 
@@ -57,7 +60,7 @@ local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 340, 0, 1000) 
 MainFrame.Position = UDim2.new(0.5, -170, 0.5, -500)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-MainFrame.BackgroundTransparency = 0.2
+MainFrame.BackgroundTransparency = 0.25
 MainFrame.Active = true
 MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
@@ -74,8 +77,8 @@ local function createSmartInput(text, pos, default, key, isNumber, width, xOffse
     lab.TextXAlignment = Enum.TextXAlignment.Left
 
     local box = Instance.new("TextBox", MainFrame)
-    box.Size = UDim2.new(0, width or 70, 0, 22)
-    box.Position = UDim2.new(0, (xOffset or 20) + 95, 0, pos + 2)
+    box.Size = UDim2.new(0, width or 80, 0, 22)
+    box.Position = UDim2.new(0, (xOffset or 20) + 90, 0, pos + 2)
     box.Text = tostring(default)
     box.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     box.BackgroundTransparency = 0.92
@@ -90,34 +93,30 @@ local function createSmartInput(text, pos, default, key, isNumber, width, xOffse
     end)
 end
 
--- TARGET SECTION
+-- UI INPUTS
 createSmartInput("Target User:", 50, Settings.TargetPlayer, "TargetPlayer", false, 120)
 createSmartInput("Target Size:", 80, Settings.Target_HRP_Size, "Target_HRP_Size", true)
 createSmartInput("Target Trans:", 110, Settings.Target_HRP_Trans, "Target_HRP_Trans", true)
-
--- GLOBAL & OFF-STATE SECTION
 createSmartInput("Global Size:", 150, Settings.HRP_Size, "HRP_Size", true)
 createSmartInput("Global Trans:", 180, Settings.HRP_Trans, "HRP_Trans", true)
-createSmartInput("Off-State Size:", 210, Settings.Off_Size, "Off_Size", true)
-createSmartInput("Off-State Trans:", 240, Settings.Off_Trans, "Off_Trans", true)
+createSmartInput("Off-State Size:", 220, Settings.Off_Size, "Off_Size", true)
+createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
+createSmartInput("Stomp Size:", 290, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
+createSmartInput("Stomp Trans:", 320, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
+createSmartInput("AI BOX Trans:", 355, Settings.AI_Box_Trans, "AI_Box_Trans", true)
 
--- SPECIALS
-createSmartInput("Stomp Size:", 280, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
-createSmartInput("Stomp Trans:", 310, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
-createSmartInput("AI BOX Trans:", 340, Settings.AI_Box_Trans, "AI_Box_Trans", true)
-
--- P1-P4 SIZE & SPEED
-local pStart = 380
+-- P1-P4 SIZE & SPEED (SIDE BY SIDE)
+local pStart = 395
 for i = 1, 4 do
     local key = "P"..i
-    createSmartInput(key.." Size:", pStart, Settings[key.."_Size"], key.."_Size", true, 45, 20)
-    createSmartInput("Speed:", pStart, Settings[key.."_Speed"], key.."_Speed", true, 45, 180)
-    pStart = pStart + 30
+    createSmartInput(key.." Size:", pStart, Settings[key.."_Size"], key.."_Size", true, 50, 20)
+    createSmartInput("Speed:", pStart, Settings[key.."_Speed"], key.."_Speed", true, 50, 180)
+    pStart = pStart + 32
 end
 
-createSmartInput("Walk Speed:", 510, Settings.WalkSpeed, "WalkSpeed", true)
-createSmartInput("Punch Speed:", 540, Settings.PunchSpeed, "PunchSpeed", true)
-createSmartInput("Stomp Speed:", 570, Settings.StompSpeed, "StompSpeed", true)
+createSmartInput("Walk Speed:", 535, Settings.WalkSpeed, "WalkSpeed", true)
+createSmartInput("Global Punch:", 565, Settings.PunchSpeed, "PunchSpeed", true)
+createSmartInput("Stomp Speed:", 595, Settings.StompSpeed, "StompSpeed", true)
 
 local function createToggle(text, pos, key)
     local btn = Instance.new("TextButton", MainFrame)
@@ -127,7 +126,7 @@ local function createToggle(text, pos, key)
     btn.BackgroundTransparency = 0.5
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 11
+    btn.TextSize = 12
     Instance.new("UICorner", btn)
 
     local function update()
@@ -138,13 +137,13 @@ local function createToggle(text, pos, key)
     update()
 end
 
-createToggle("AI BOX", 620, "AI_Box_Enabled")
-createToggle("WS PROTECTION", 660, "WS_Protection")
-createToggle("ANTI-STUN", 700, "AntiWeave")
-createToggle("SOLID SHELL", 740, "SolidToggle")
-createToggle("TP WALK (])", 780, "TPWalkEnabled")
-createToggle("SMART BOX", 820, "SmartBox")
-createToggle("STYLES PUNCH SPEED", 860, "PunchEnabled")
+createToggle("AI BOX", 640, "AI_Box_Enabled")
+createToggle("WS PROTECTION", 680, "WS_Protection")
+createToggle("ANTI-STUN", 720, "AntiWeave")
+createToggle("SOLID SHELL", 760, "SolidToggle")
+createToggle("TP WALK (])", 800, "TPWalkEnabled")
+createToggle("SMART BOX", 840, "SmartBox")
+createToggle("STYLES PUNCH SPEED", 880, "PunchEnabled")
 
 --------------------------------------------------
 -- CORE LOGIC
@@ -176,6 +175,7 @@ RunService.Heartbeat:Connect(function()
 
     activePunchType = nil
     isStomping = false
+    
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
@@ -185,7 +185,8 @@ RunService.Heartbeat:Connect(function()
             elseif punchIDs[id] then
                 activePunchType = punchIDs[id]
                 if Settings.PunchEnabled then
-                    t:AdjustSpeed(Settings[activePunchType.."_Speed"] or Settings.PunchSpeed)
+                    local specificSpeed = Settings[activePunchType.."_Speed"]
+                    t:AdjustSpeed(specificSpeed or Settings.PunchSpeed)
                 end
             end
         end
@@ -199,7 +200,8 @@ RunService.Heartbeat:Connect(function()
                 local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
                 
                 local size, trans = Settings.HRP_Size, Settings.HRP_Trans
-                
+
+                -- HITBOX PRIORITY WITH 35 STUD LIMIT FOR SPECIALS
                 if isStomping and dist <= LIMIT_DISTANCE then
                     size, trans = Settings.Stomp_HRP_Size, Settings.Stomp_HRP_Trans
                 elseif Settings.AI_Box_Enabled and activePunchType and dist <= LIMIT_DISTANCE then
@@ -208,12 +210,17 @@ RunService.Heartbeat:Connect(function()
                     size, trans = Settings.Target_HRP_Size, Settings.Target_HRP_Trans
                 end
                 
-                if Settings.SmartBox and getKnockedBool(v) then
-                    root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
-                    root.Transparency = Settings.Off_Trans
-                else
+                local shouldExpand = true
+                if Settings.SmartBox then
+                    shouldExpand = (not getKnockedBool(v))
+                end
+
+                if shouldExpand then
                     root.Size = Vector3.new(size, size, size)
                     root.Transparency = trans
+                else
+                    root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
+                    root.Transparency = Settings.Off_Trans
                 end
                 root.CanCollide = false
             end
