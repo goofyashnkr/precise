@@ -25,7 +25,7 @@ local Settings = {
     Off_Trans = 1, 
     SolidToggle = false,
     Solid_Size = 5,
-    WalkSpeed = 11.5,          
+    WalkSpeed = 11.5,           
     WS_Protection = true,  
     AntiWeave = true,
     TPWalkEnabled = false,
@@ -61,7 +61,7 @@ ScreenGui.Name = "PRECISE_2.0_MODERN"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 950) -- Extended height to fit all original + new settings
+MainFrame.Size = UDim2.new(0, 320, 0, 950) 
 MainFrame.Position = UDim2.new(0.5, -160, 0.5, -475)
 MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 MainFrame.BackgroundTransparency = 0.25
@@ -115,7 +115,6 @@ local function createSmartInput(text, pos, default, key, isNumber)
     end)
 end
 
--- UI INPUTS (Kept all original settings + added AI Box)
 createSmartInput("Target User:", 50, Settings.TargetPlayer, "TargetPlayer", false)
 createSmartInput("Target Size:", 80, Settings.Target_HRP_Size, "Target_HRP_Size", true)
 createSmartInput("Target Trans:", 110, Settings.Target_HRP_Trans, "Target_HRP_Trans", true)
@@ -126,7 +125,6 @@ createSmartInput("Off-State Trans:", 250, Settings.Off_Trans, "Off_Trans", true)
 createSmartInput("Stomp HRP Size:", 290, Settings.Stomp_HRP_Size, "Stomp_HRP_Size", true)
 createSmartInput("Stomp HRP Trans:", 320, Settings.Stomp_HRP_Trans, "Stomp_HRP_Trans", true)
 
--- AI BOX SPECIFIC INPUTS
 createSmartInput("P1 SIZE:", 360, Settings.P1_Size, "P1_Size", true)
 createSmartInput("P2 SIZE:", 390, Settings.P2_Size, "P2_Size", true)
 createSmartInput("P3 SIZE:", 420, Settings.P3_Size, "P3_Size", true)
@@ -178,6 +176,7 @@ end
 RunService.Heartbeat:Connect(function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
     local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
     
@@ -192,7 +191,6 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    -- STOMP & PUNCH DETECTION (Now includes AI Box types)
     local foundStomp = false
     activePunchType = nil
     
@@ -213,38 +211,45 @@ RunService.Heartbeat:Connect(function()
     isStomping = foundStomp
 
     for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character then
+        if v ~= LocalPlayer and v.Character and myRoot then
             local root = v.Character:FindFirstChild("HumanoidRootPart")
             local vHum = v.Character:FindFirstChildOfClass("Humanoid")
             
-            local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
-            
-            -- SIZE LOGIC PRIORITY: Stomp > AI Box > Target > Global
-            local currentSize, currentTrans
-            
-            if isStomping then
-                currentSize = Settings.Stomp_HRP_Size
-                currentTrans = Settings.Stomp_HRP_Trans
-            elseif Settings.AI_Box_Enabled and activePunchType then
-                currentSize = Settings[activePunchType.."_Size"] or Settings.HRP_Size
-                currentTrans = Settings.Target_HRP_Trans -- Uses target trans for punch clarity
-            elseif isTarget then
-                currentSize = Settings.Target_HRP_Size
-                currentTrans = Settings.Target_HRP_Trans
-            else
-                currentSize = Settings.HRP_Size
-                currentTrans = Settings.HRP_Trans
-            end
-            
-            local shouldExpand = false
-            if Settings.SmartBox then
-                shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
-            else
-                shouldExpand = true 
-            end
-
             if root then
-                if shouldExpand then
+                -- DISTANCE CHECK
+                local distance = (myRoot.Position - root.Position).Magnitude
+                local isWithinRange = (distance <= 20)
+                
+                local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
+                
+                -- SIZE LOGIC PRIORITY: Stomp > AI Box > Target > Global
+                local currentSize, currentTrans
+                
+                if isStomping and isWithinRange then
+                    currentSize = Settings.Stomp_HRP_Size
+                    currentTrans = Settings.Stomp_HRP_Trans
+                elseif Settings.AI_Box_Enabled and activePunchType and isWithinRange then
+                    currentSize = Settings[activePunchType.."_Size"] or Settings.HRP_Size
+                    currentTrans = Settings.Target_HRP_Trans 
+                elseif isTarget then
+                    currentSize = Settings.Target_HRP_Size
+                    currentTrans = Settings.Target_HRP_Trans
+                else
+                    currentSize = Settings.HRP_Size
+                    currentTrans = Settings.HRP_Trans
+                end
+                
+                local shouldExpand = false
+                if Settings.SmartBox then
+                    shouldExpand = (vHum and vHum.Health > 0 and not getKnockedBool(v))
+                else
+                    shouldExpand = true 
+                end
+
+                -- Final Condition: Must be alive/valid AND within 20 studs for Hitbox/AI Box
+                local finalExpand = shouldExpand and isWithinRange
+
+                if finalExpand then
                     root.Size = Vector3.new(currentSize, currentSize, currentSize)
                     root.Transparency = currentTrans
                     root.CanCollide = false
@@ -254,7 +259,7 @@ RunService.Heartbeat:Connect(function()
                 end
                 
                 local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and shouldExpand then
+                if Settings.SolidToggle and finalExpand then
                     if not shell then
                         shell = Instance.new("Part", root)
                         shell.Name = "SolidShell"
