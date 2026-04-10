@@ -40,12 +40,13 @@ local Settings = {
     AccentColor = Color3.fromRGB(0, 170, 255),
     GuiTransparency = 0.25,
     RenderDistance = 20,
-    HeadlessEnabled = false -- New Headless Setting
+    HeadlessEnabled = false
 }
 
 local isTriggerHeld = false
 local isStomping = false 
 local activePunchType = nil 
+local sprintInputHeld = false 
 local TP_SPEED = 70
 
 local punchIDs = {
@@ -214,7 +215,7 @@ AddToggle(mTab, "WS PROTECTION", "WS_Protection")
 AddToggle(mTab, "TP WALK (])", "TPWalkEnabled")
 AddSlider(mTab, "Walk Speed", "WalkSpeed", 5, 50, 100)
 
--- CONFIGS TAB (Added Headless here)
+-- CONFIGS TAB
 AddToggle(cTab, "LOCAL HEADLESS", "HeadlessEnabled")
 AddSlider(cTab, "Menu Trans", "GuiTransparency", 0, 1)
 AddSlider(cTab, "Detection Dist", "RenderDistance", 5, 100)
@@ -235,23 +236,25 @@ Instance.new("UIListLayout", scrl).Padding = UDim.new(0, 5)
 
 local function LoadConfigs()
     for _, v in pairs(scrl:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
-    for _, file in pairs(listfiles(ConfigFolder)) do
-        local n = file:match("([^\\/%.]+)%.json$")
-        local f = Instance.new("Frame", scrl); f.Size = UDim2.new(1,-6,0,38); f.BackgroundColor3 = Color3.fromRGB(28,28,32); Instance.new("UICorner", f)
-        local t = Instance.new("TextLabel", f); t.Size = UDim2.new(0.4,0,1,0); t.Text = n; t.TextColor3 = Color3.new(1,1,1); t.BackgroundTransparency = 1; t.Position = UDim2.new(0,10,0,0); t.TextXAlignment = 0
-        local lB = Instance.new("TextButton", f); lB.Size = UDim2.new(0.25,0,0.7,0); lB.Position = UDim2.new(0.45,0,0.15,0); lB.Text = "LOAD"; lB.BackgroundColor3 = Color3.fromRGB(50,50,55); lB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", lB)
-        local dB = Instance.new("TextButton", f); dB.Size = UDim2.new(0.25,0,0.7,0); dB.Position = UDim2.new(0.72,0,0.15,0); dB.Text = "DEL"; dB.BackgroundColor3 = Color3.fromRGB(100,30,30); dB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", dB)
-        
-        lB.MouseButton1Click:Connect(function()
-            local d = HttpService:JSONDecode(readfile(file))
-            for k, v in pairs(d) do 
-                if k == "AccentColor" then Settings[k] = Color3.new(v[1], v[2], v[3]) 
-                elseif k == "MenuKey" then Settings[k] = Enum.KeyCode[v] 
-                else Settings[k] = v end 
-            end
-            RefreshAllUI() 
-        end)
-        dB.MouseButton1Click:Connect(function() delfile(file) f:Destroy() end)
+    if listfiles then
+        for _, file in pairs(listfiles(ConfigFolder)) do
+            local n = file:match("([^\\/%.]+)%.json$")
+            local f = Instance.new("Frame", scrl); f.Size = UDim2.new(1,-6,0,38); f.BackgroundColor3 = Color3.fromRGB(28,28,32); Instance.new("UICorner", f)
+            local t = Instance.new("TextLabel", f); t.Size = UDim2.new(0.4,0,1,0); t.Text = n; t.TextColor3 = Color3.new(1,1,1); t.BackgroundTransparency = 1; t.Position = UDim2.new(0,10,0,0); t.TextXAlignment = 0
+            local lB = Instance.new("TextButton", f); lB.Size = UDim2.new(0.25,0,0.7,0); lB.Position = UDim2.new(0.45,0,0.15,0); lB.Text = "LOAD"; lB.BackgroundColor3 = Color3.fromRGB(50,50,55); lB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", lB)
+            local dB = Instance.new("TextButton", f); dB.Size = UDim2.new(0.25,0,0.7,0); dB.Position = UDim2.new(0.72,0,0.15,0); dB.Text = "DEL"; dB.BackgroundColor3 = Color3.fromRGB(100,30,30); dB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", dB)
+            
+            lB.MouseButton1Click:Connect(function()
+                local d = HttpService:JSONDecode(readfile(file))
+                for k, v in pairs(d) do 
+                    if k == "AccentColor" then Settings[k] = Color3.new(v[1], v[2], v[3]) 
+                    elseif k == "MenuKey" then Settings[k] = Enum.KeyCode[v] 
+                    else Settings[k] = v end 
+                end
+                RefreshAllUI() 
+            end)
+            dB.MouseButton1Click:Connect(function() delfile(file) f:Destroy() end)
+        end
     end
 end
 
@@ -289,8 +292,29 @@ RunService.Heartbeat:Connect(function()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
-    local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
     
+    -- ==============================================================
+    -- SPRINT CHECK (rbxassetid://127576302225448)
+    -- ==============================================================
+    local specialID = "rbxassetid://127576302225448"
+    local isSpecialAnimPlaying = false
+
+    if animator then
+        for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
+            if tostring(t.Animation.AnimationId) == specialID then
+                isSpecialAnimPlaying = true
+                break
+            end
+        end
+    end
+
+    -- THRESHOLD LOGIC: If WalkSpeed is 16.1+, we ALWAYS stay on (true).
+    -- If it's 16.0 or lower, we only stay on if NOT sprinting.
+    local shouldScriptControl = true
+    if Settings.WalkSpeed <= 16 then
+        shouldScriptControl = not (sprintInputHeld or isSpecialAnimPlaying)
+    end
+
     -- HEADLESS LOGIC
     if char then
         local head = char:FindFirstChild("Head")
@@ -298,17 +322,19 @@ RunService.Heartbeat:Connect(function()
             local t = Settings.HeadlessEnabled and 1 or 0
             head.Transparency = t
             for _, v in pairs(head:GetDescendants()) do
-                if v:IsA("BasePart") or v:IsA("Decal") then
-                    v.Transparency = t
-                end
+                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = t end
             end
         end
     end
 
     if hum then
-        if (not Settings.WS_Protection or not isTriggerHeld) then
-            hum.WalkSpeed = targetSpeed
+        if shouldScriptControl then
+            local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
+            if (not Settings.WS_Protection or not isTriggerHeld) then
+                hum.WalkSpeed = targetSpeed
+            end
         end
+
         if Settings.AntiWeave then
             for _, child in ipairs(char:GetChildren()) do
                 if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then child:Destroy() end
@@ -355,16 +381,27 @@ RunService.Heartbeat:Connect(function()
                     currentSize = Settings.HRP_Size; currentTrans = Settings.HRP_Trans
                 end
                 
-                local finalExpand = (isWithinRange and (not Settings.SmartBox or (vHum and vHum.Health > 0 and not getKnockedBool(v))))
+                local shouldShowHitbox = false
+                if isWithinRange then
+                    if isStomping then
+                        shouldShowHitbox = true
+                    elseif Settings.SmartBox then
+                        if vHum and vHum.Health > 0 and not getKnockedBool(v) then
+                            shouldShowHitbox = true
+                        end
+                    else
+                        shouldShowHitbox = true
+                    end
+                end
 
-                if finalExpand then
+                if shouldShowHitbox then
                     root.Size = Vector3.new(currentSize, currentSize, currentSize); root.Transparency = currentTrans; root.CanCollide = false
                 else
                     root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size); root.Transparency = Settings.Off_Trans
                 end
                 
                 local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and finalExpand then
+                if Settings.SolidToggle and shouldShowHitbox then
                     if not shell then shell = Instance.new("Part", root) shell.Name = "SolidShell" shell.Transparency = 1 end
                     shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size); shell.CFrame = root.CFrame
                 elseif shell then shell:Destroy() end
@@ -375,8 +412,17 @@ end)
 
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
+        sprintInputHeld = true
+    end
     if input.KeyCode == Settings.MenuKey then MainFrame.Visible = not MainFrame.Visible end
-    if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = true end
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = true end
     if input.KeyCode == Enum.KeyCode.RightBracket then Settings.TPWalkEnabled = not Settings.TPWalkEnabled end
 end)
-UserInputService.InputEnded:Connect(function(input) if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = false end end)
+
+UserInputService.InputEnded:Connect(function(input) 
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
+        sprintInputHeld = false
+    end
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = false end 
+end)
