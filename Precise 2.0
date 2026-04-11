@@ -52,6 +52,7 @@ local BlackColor = Color3.new(0,0,0)
 local isTriggerHeld = false
 local activePunchType = nil 
 local sprintInputHeld = false 
+local isStomping = false
 local TP_SPEED = 70
 
 local punchIDs = {
@@ -202,8 +203,8 @@ AddSlider(hTab, "P1 Size", "P1_Size", 1, 15)
 AddSlider(hTab, "P2 Size", "P2_Size", 1, 15)
 AddSlider(hTab, "P3 Size", "P3_Size", 1, 15)
 AddSlider(hTab, "P4 Size", "P4_Size", 1, 15)
-AddSlider(hTab, "Smart Box Size", "Off_Size", 1, 15) -- For Benji logic compatibility
-AddSlider(hTab, "Smart Box Transparencys", "Off_Trans", 0, 1)
+AddSlider(hTab, "Smart Box Size", "Off_Size", 1, 15) 
+AddSlider(hTab, "Smart Box Transparency", "Off_Trans", 0, 1)
 
 -- STATS TAB
 AddToggle(sTab, "ANTI-STUN", "AntiWeave")
@@ -226,7 +227,7 @@ AddInput(cTab, "Target User", "TargetPlayer")
 AddSlider(cTab, "Target Size", "Target_HRP_Size", 1, 15)
 AddSlider(cTab, "Target Transparency", "Target_HRP_Trans", 0, 1)
 
--- Preset Logic...
+-- Preset Logic
 local bBtn = Instance.new("TextButton", cTab); bBtn.Size = UDim2.new(1,0,0,32); bBtn.Text = "KEYBIND: "..Settings.MenuKey.Name; bBtn.BackgroundColor3 = Color3.fromRGB(35,35,40); bBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", bBtn)
 local binding = false; bBtn.MouseButton1Click:Connect(function() binding = true bBtn.Text = "..." end)
 UserInputService.InputBegan:Connect(function(i,g) if binding then Settings.MenuKey = i.KeyCode; bBtn.Text = "KEYBIND: "..i.KeyCode.Name; binding = false end end)
@@ -302,7 +303,7 @@ local function resetHRP(targetPlayer, char)
 end
 
 -- ==================================================================
--- CORE LOGIC (BENJI HITBOX INTEGRATION)
+-- CORE LOGIC (BENJI HITBOX + EXACT PRECISE 2.0 PUNCH SPEED)
 -- ==================================================================
 RunService.Heartbeat:Connect(function(dt)
     local char = LocalPlayer.Character
@@ -310,7 +311,7 @@ RunService.Heartbeat:Connect(function(dt)
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
     
-    -- [1] SPRINT & HEADLESS 
+    -- SPRINT CHECK
     local specialID = "rbxassetid://127576302225448"
     local isSpecialAnimPlaying = false
     if animator then
@@ -321,6 +322,7 @@ RunService.Heartbeat:Connect(function(dt)
 
     local shouldScriptControl = (Settings.WalkSpeed > 16) or (not (sprintInputHeld or isSpecialAnimPlaying))
 
+    -- HEADLESS LOGIC
     if char then
         local head = char:FindFirstChild("Head")
         if head then
@@ -330,6 +332,7 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
 
+    -- MOVEMENT LOGIC
     if hum then
         if shouldScriptControl then
             local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
@@ -342,23 +345,31 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- [2] ANIMATION HANDLING
-    local isStomping = false
+    -- ==============================================================
+    -- EXACT PRECISE 2.0 ANIMATION LOGIC
+    -- ==============================================================
+    local foundStomp = false
     activePunchType = nil
+    
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
             if stompIDs[id] then
-                isStomping = true
+                foundStomp = true
                 pcall(function() t:AdjustSpeed(Settings.StompSpeed) end)
             elseif punchIDs[id] then
                 if typeof(punchIDs[id]) == "string" then activePunchType = punchIDs[id] end
                 if Settings.PunchEnabled then pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end) end
+            elseif t.Name:match("^[1-4]$") and Settings.PunchEnabled then
+                pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end)
             end
         end
     end
+    isStomping = foundStomp
 
-    -- [3] BENJI-STYLE HITBOX SYSTEM
+    -- ==============================================================
+    -- BENJI-STYLE HITBOX LOGIC
+    -- ==============================================================
     lastHitboxUpdate = lastHitboxUpdate + dt
     if lastHitboxUpdate >= hitboxUpdateRate then
         lastHitboxUpdate = 0
@@ -375,7 +386,6 @@ RunService.Heartbeat:Connect(function(dt)
                     local isWithinRange = (dist <= Settings.RenderDistance)
                     local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
                     
-                    -- Check Knocked Status (Benji Logic)
                     local isKnocked = (tHum.Health <= 0)
                     if not isKnocked and liveFolder then
                         local entry = liveFolder:FindFirstChild(v.Name)
@@ -386,7 +396,6 @@ RunService.Heartbeat:Connect(function(dt)
                     local shouldApply = isWithinRange and (not Settings.SmartBox or not isKnocked)
 
                     if shouldApply then
-                        -- Cache Original Stats
                         if not originalHRPProps[v] then
                             originalHRPProps[v] = {
                                 Size = tRoot.Size,
@@ -396,7 +405,6 @@ RunService.Heartbeat:Connect(function(dt)
                             }
                         end
 
-                        -- Determine Size Priorities
                         local sizeVal = Settings.HRP_Size
                         local transVal = Settings.HRP_Trans
                         
@@ -410,7 +418,6 @@ RunService.Heartbeat:Connect(function(dt)
                             transVal = Settings.Target_HRP_Trans
                         end
 
-                        -- Apply modifications
                         tRoot.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
                         tRoot.Transparency = transVal
                         tRoot.Color = BlackColor
@@ -418,7 +425,6 @@ RunService.Heartbeat:Connect(function(dt)
                         tRoot.CanTouch = true
                         tRoot.CanQuery = true
 
-                        -- Benji Solid Shell Logic
                         local shell = tRoot:FindFirstChild("SolidShell")
                         if Settings.SolidToggle then
                             if not shell then
