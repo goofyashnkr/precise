@@ -43,7 +43,6 @@ local Settings = {
     HeadlessEnabled = false
 }
 
--- Benji System Caches
 local originalHRPProps = {}
 local lastHitboxUpdate = 0
 local hitboxUpdateRate = 0.08
@@ -303,7 +302,7 @@ local function resetHRP(targetPlayer, char)
 end
 
 -- ==================================================================
--- CORE LOGIC (BENJI HITBOX + EXACT PRECISE 2.0 PUNCH SPEED)
+-- CORE LOGIC
 -- ==================================================================
 RunService.Heartbeat:Connect(function(dt)
     local char = LocalPlayer.Character
@@ -345,9 +344,7 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ==============================================================
-    -- EXACT PRECISE 2.0 ANIMATION LOGIC
-    -- ==============================================================
+    -- ANIMATION SPEEDS
     local foundStomp = false
     activePunchType = nil
     
@@ -368,7 +365,7 @@ RunService.Heartbeat:Connect(function(dt)
     isStomping = foundStomp
 
     -- ==============================================================
-    -- BENJI-STYLE HITBOX LOGIC
+    -- BENJI HITBOX + SMART BOX INTEGRATION
     -- ==============================================================
     lastHitboxUpdate = lastHitboxUpdate + dt
     if lastHitboxUpdate >= hitboxUpdateRate then
@@ -403,44 +400,34 @@ RunService.Heartbeat:Connect(function(dt)
                             }
                         end
 
-                        -- SMART BOX LOGIC
-                        local shouldShowActiveHitbox = true
+                        -- Logic Selection
+                        local finalSize = Settings.HRP_Size
+                        local finalTrans = Settings.HRP_Trans
+                        local finalColor = BlackColor -- Global hitbox look
+
+                        -- Priority Order: Stomp > SmartBox > AI > Target > Global
                         if isStomping then
-                            shouldShowActiveHitbox = true
-                        elseif Settings.SmartBox then
-                            if isKnocked then
-                                shouldShowActiveHitbox = false
-                            end
+                            finalSize = Settings.Stomp_HRP_Size
+                            finalTrans = Settings.Stomp_HRP_Trans
+                        elseif Settings.SmartBox and isKnocked then
+                            finalSize = Settings.Off_Size
+                            finalTrans = Settings.Off_Trans
+                        elseif Settings.AI_Box_Enabled and activePunchType then
+                            finalSize = Settings[activePunchType.."_Size"] or finalSize
+                        elseif isTarget then
+                            finalSize = Settings.Target_HRP_Size
+                            finalTrans = Settings.Target_HRP_Trans
                         end
 
-                        if shouldShowActiveHitbox then
-                            local sizeVal = Settings.HRP_Size
-                            local transVal = Settings.HRP_Trans
-                            
-                            if isStomping then
-                                sizeVal = Settings.Stomp_HRP_Size
-                                transVal = Settings.Stomp_HRP_Trans
-                            elseif Settings.AI_Box_Enabled and activePunchType then
-                                sizeVal = Settings[activePunchType.."_Size"] or sizeVal
-                            elseif isTarget then
-                                sizeVal = Settings.Target_HRP_Size
-                                transVal = Settings.Target_HRP_Trans
-                            end
-
-                            tRoot.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
-                            tRoot.Transparency = transVal
-                            tRoot.Color = BlackColor
-                        else
-                            -- APPLY OFF SETTINGS (Smart Box Effect)
-                            tRoot.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
-                            tRoot.Transparency = Settings.Off_Trans
-                            tRoot.Color = originalHRPProps[v].Color
-                        end
-
+                        -- Apply values
+                        tRoot.Size = Vector3.new(finalSize, finalSize, finalSize)
+                        tRoot.Transparency = finalTrans
+                        tRoot.Color = finalColor
                         tRoot.CanCollide = false
                         tRoot.CanTouch = true
                         tRoot.CanQuery = true
 
+                        -- Solid Shell
                         local shell = tRoot:FindFirstChild("SolidShell")
                         if Settings.SolidToggle then
                             if not shell then
