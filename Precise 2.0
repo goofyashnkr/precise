@@ -43,17 +43,20 @@ local Settings = {
     HeadlessEnabled = false
 }
 
+-- Benji System Caches
+local originalHRPProps = {}
+local lastHitboxUpdate = 0
+local hitboxUpdateRate = 0.08
+local BlackColor = Color3.new(0,0,0)
+
 local isTriggerHeld = false
-local isStomping = false 
 local activePunchType = nil 
 local sprintInputHeld = false 
 local TP_SPEED = 70
 
 local punchIDs = {
-    ["rbxassetid://18312333191"] = "P1", 
-    ["rbxassetid://18312335714"] = "P2",
-    ["rbxassetid://18312338197"] = "P3", 
-    ["rbxassetid://18312340119"] = "P4",
+    ["rbxassetid://18312333191"] = "P1", ["rbxassetid://18312335714"] = "P2",
+    ["rbxassetid://18312338197"] = "P3", ["rbxassetid://18312340119"] = "P4",
     ["rbxassetid://18312344029"] = true, ["rbxassetid://18312346524"] = true,
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
@@ -67,7 +70,7 @@ local stompIDs = {
 -- GUI SETUP
 -- ==================================================================
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-ScreenGui.Name = "PRECISE_V2_HEADLESS"
+ScreenGui.Name = "PRECISE_V2_BENJI_HYBRID"
 ScreenGui.ResetOnSpawn = false
 
 local MainFrame = Instance.new("Frame", ScreenGui)
@@ -80,7 +83,7 @@ MainFrame.Active = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14)
 
 local TitleLabel = Instance.new("TextLabel", MainFrame)
-TitleLabel.Size = UDim2.new(1, 0, 0, 55); TitleLabel.Text = "PRECISE 2.0"; TitleLabel.TextColor3 = Color3.new(1,1,1); TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 22; TitleLabel.BackgroundTransparency = 1
+TitleLabel.Size = UDim2.new(1, 0, 0, 55); TitleLabel.Text = "PRECISE 2.0 (BENJI LOGIC)"; TitleLabel.TextColor3 = Color3.new(1,1,1); TitleLabel.Font = Enum.Font.GothamBold; TitleLabel.TextSize = 22; TitleLabel.BackgroundTransparency = 1
 
 local TabContainer = Instance.new("Frame", MainFrame)
 TabContainer.Size = UDim2.new(1, -20, 0, 40); TabContainer.Position = UDim2.new(0, 10, 0, 60); TabContainer.BackgroundTransparency = 1
@@ -199,8 +202,8 @@ AddSlider(hTab, "P1 Size", "P1_Size", 1, 15)
 AddSlider(hTab, "P2 Size", "P2_Size", 1, 15)
 AddSlider(hTab, "P3 Size", "P3_Size", 1, 15)
 AddSlider(hTab, "P4 Size", "P4_Size", 1, 15)
-AddSlider(hTab, "Smart Box Size", "Off_Size", 1, 15)
-AddSlider(hTab, "Smart Box Transparency", "Off_Trans", 0, 1)
+AddSlider(hTab, "Off_Size", "Off_Size", 1, 15) -- For Benji logic compatibility
+AddSlider(hTab, "Off_Trans", "Off_Trans", 0, 1)
 
 -- STATS TAB
 AddToggle(sTab, "ANTI-STUN", "AntiWeave")
@@ -223,6 +226,7 @@ AddInput(cTab, "Target User", "TargetPlayer")
 AddSlider(cTab, "Target Size", "Target_HRP_Size", 1, 15)
 AddSlider(cTab, "Target Transparency", "Target_HRP_Trans", 0, 1)
 
+-- Preset Logic...
 local bBtn = Instance.new("TextButton", cTab); bBtn.Size = UDim2.new(1,0,0,32); bBtn.Text = "KEYBIND: "..Settings.MenuKey.Name; bBtn.BackgroundColor3 = Color3.fromRGB(35,35,40); bBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", bBtn)
 local binding = false; bBtn.MouseButton1Click:Connect(function() binding = true bBtn.Text = "..." end)
 UserInputService.InputBegan:Connect(function(i,g) if binding then Settings.MenuKey = i.KeyCode; bBtn.Text = "KEYBIND: "..i.KeyCode.Name; binding = false end end)
@@ -278,63 +282,59 @@ for _, cval in pairs(colors) do
 end
 
 -- ==================================================================
--- CORE LOGIC
+-- UTILITIES
 -- ==================================================================
-local function getKnockedBool(p)
-    local live = workspace:FindFirstChild("Live")
-    local entry = live and live:FindFirstChild(p.Name)
-    local knocked = entry and entry:FindFirstChild("Knocked")
-    return knocked and knocked:IsA("BoolValue") and knocked.Value or false
+local function resetHRP(targetPlayer, char)
+    local props = originalHRPProps[targetPlayer]
+    if props and char then
+        local Root = char:FindFirstChild("HumanoidRootPart")
+        if Root then
+            Root.Size = props.Size
+            Root.Transparency = props.Transparency
+            Root.CanCollide = props.CanCollide
+            Root.Color = props.Color
+            Root.CanTouch = true
+            Root.CanQuery = true
+            local shell = Root:FindFirstChild("SolidShell")
+            if shell then shell:Destroy() end
+        end
+    end
 end
 
-RunService.Heartbeat:Connect(function()
+-- ==================================================================
+-- CORE LOGIC (BENJI HITBOX INTEGRATION)
+-- ==================================================================
+RunService.Heartbeat:Connect(function(dt)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
     
-    -- ==============================================================
-    -- SPRINT CHECK (rbxassetid://127576302225448)
-    -- ==============================================================
+    -- [1] SPRINT & HEADLESS 
     local specialID = "rbxassetid://127576302225448"
     local isSpecialAnimPlaying = false
-
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
-            if tostring(t.Animation.AnimationId) == specialID then
-                isSpecialAnimPlaying = true
-                break
-            end
+            if tostring(t.Animation.AnimationId) == specialID then isSpecialAnimPlaying = true break end
         end
     end
 
-    -- THRESHOLD LOGIC: If WalkSpeed is 16.1+, we ALWAYS stay on (true).
-    -- If it's 16.0 or lower, we only stay on if NOT sprinting.
-    local shouldScriptControl = true
-    if Settings.WalkSpeed <= 16 then
-        shouldScriptControl = not (sprintInputHeld or isSpecialAnimPlaying)
-    end
+    local shouldScriptControl = (Settings.WalkSpeed > 16) or (not (sprintInputHeld or isSpecialAnimPlaying))
 
-    -- HEADLESS LOGIC
     if char then
         local head = char:FindFirstChild("Head")
         if head then
             local t = Settings.HeadlessEnabled and 1 or 0
             head.Transparency = t
-            for _, v in pairs(head:GetDescendants()) do
-                if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = t end
-            end
+            for _, v in pairs(head:GetDescendants()) do if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = t end end
         end
     end
 
     if hum then
         if shouldScriptControl then
             local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
-            if (not Settings.WS_Protection or not isTriggerHeld) then
-                hum.WalkSpeed = targetSpeed
-            end
+            if (not Settings.WS_Protection or not isTriggerHeld) then hum.WalkSpeed = targetSpeed end
         end
-
         if Settings.AntiWeave then
             for _, child in ipairs(char:GetChildren()) do
                 if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then child:Destroy() end
@@ -342,74 +342,107 @@ RunService.Heartbeat:Connect(function()
         end
     end
 
-    local foundStomp = false
+    -- [2] ANIMATION HANDLING
+    local isStomping = false
     activePunchType = nil
-    
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
             if stompIDs[id] then
-                foundStomp = true
+                isStomping = true
                 pcall(function() t:AdjustSpeed(Settings.StompSpeed) end)
             elseif punchIDs[id] then
                 if typeof(punchIDs[id]) == "string" then activePunchType = punchIDs[id] end
                 if Settings.PunchEnabled then pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end) end
-            elseif t.Name:match("^[1-4]$") and Settings.PunchEnabled then
-                pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end)
             end
         end
     end
-    isStomping = foundStomp
 
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= LocalPlayer and v.Character and myRoot then
-            local root = v.Character:FindFirstChild("HumanoidRootPart")
-            local vHum = v.Character:FindFirstChildOfClass("Humanoid")
-            if root then
-                local dist = (myRoot.Position - root.Position).Magnitude
-                local isWithinRange = (dist <= Settings.RenderDistance)
-                local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
+    -- [3] BENJI-STYLE HITBOX SYSTEM
+    lastHitboxUpdate = lastHitboxUpdate + dt
+    if lastHitboxUpdate >= hitboxUpdateRate then
+        lastHitboxUpdate = 0
+        local liveFolder = workspace:FindFirstChild("Live")
+        
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= LocalPlayer then
+                local tChar = v.Character
+                local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
                 
-                local currentSize, currentTrans
-                if isStomping and isWithinRange then
-                    currentSize = Settings.Stomp_HRP_Size; currentTrans = Settings.Stomp_HRP_Trans
-                elseif Settings.AI_Box_Enabled and activePunchType and isWithinRange then
-                    currentSize = Settings[activePunchType.."_Size"] or Settings.HRP_Size; currentTrans = Settings.Target_HRP_Trans 
-                elseif isTarget then
-                    currentSize = Settings.Target_HRP_Size; currentTrans = Settings.Target_HRP_Trans
-                else
-                    currentSize = Settings.HRP_Size; currentTrans = Settings.HRP_Trans
-                end
-                
-                local shouldShowHitbox = false
-                if isWithinRange then
-                    if isStomping then
-                        shouldShowHitbox = true
-                    elseif Settings.SmartBox then
-                        if vHum and vHum.Health > 0 and not getKnockedBool(v) then
-                            shouldShowHitbox = true
+                if tRoot and tHum and myRoot then
+                    local dist = (myRoot.Position - tRoot.Position).Magnitude
+                    local isWithinRange = (dist <= Settings.RenderDistance)
+                    local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
+                    
+                    -- Check Knocked Status (Benji Logic)
+                    local isKnocked = (tHum.Health <= 0)
+                    if not isKnocked and liveFolder then
+                        local entry = liveFolder:FindFirstChild(v.Name)
+                        local knockedVal = entry and entry:FindFirstChild("Knocked")
+                        if knockedVal and knockedVal.Value == true then isKnocked = true end
+                    end
+
+                    local shouldApply = isWithinRange and (not Settings.SmartBox or not isKnocked)
+
+                    if shouldApply then
+                        -- Cache Original Stats
+                        if not originalHRPProps[v] then
+                            originalHRPProps[v] = {
+                                Size = tRoot.Size,
+                                Transparency = tRoot.Transparency,
+                                CanCollide = tRoot.CanCollide,
+                                Color = tRoot.Color 
+                            }
                         end
+
+                        -- Determine Size Priorities
+                        local sizeVal = Settings.HRP_Size
+                        local transVal = Settings.HRP_Trans
+                        
+                        if isStomping then
+                            sizeVal = Settings.Stomp_HRP_Size
+                            transVal = Settings.Stomp_HRP_Trans
+                        elseif Settings.AI_Box_Enabled and activePunchType then
+                            sizeVal = Settings[activePunchType.."_Size"] or sizeVal
+                        elseif isTarget then
+                            sizeVal = Settings.Target_HRP_Size
+                            transVal = Settings.Target_HRP_Trans
+                        end
+
+                        -- Apply modifications
+                        tRoot.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
+                        tRoot.Transparency = transVal
+                        tRoot.Color = BlackColor
+                        tRoot.CanCollide = false
+                        tRoot.CanTouch = true
+                        tRoot.CanQuery = true
+
+                        -- Benji Solid Shell Logic
+                        local shell = tRoot:FindFirstChild("SolidShell")
+                        if Settings.SolidToggle then
+                            if not shell then
+                                shell = Instance.new("Part", tRoot)
+                                shell.Name = "SolidShell"
+                                shell.Transparency = 1
+                                shell.CanCollide = true 
+                                shell.Massless = true
+                            end
+                            shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size)
+                            shell.CFrame = tRoot.CFrame
+                        elseif shell then shell:Destroy() end
                     else
-                        shouldShowHitbox = true
+                        resetHRP(v, tChar)
                     end
                 end
-
-                if shouldShowHitbox then
-                    root.Size = Vector3.new(currentSize, currentSize, currentSize); root.Transparency = currentTrans; root.CanCollide = false
-                else
-                    root.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size); root.Transparency = Settings.Off_Trans
-                end
-                
-                local shell = root:FindFirstChild("SolidShell")
-                if Settings.SolidToggle and shouldShowHitbox then
-                    if not shell then shell = Instance.new("Part", root) shell.Name = "SolidShell" shell.Transparency = 1 end
-                    shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size); shell.CFrame = root.CFrame
-                elseif shell then shell:Destroy() end
             end
         end
     end
 end)
 
+-- ==================================================================
+-- INPUT HANDLING
+-- ==================================================================
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
@@ -425,4 +458,8 @@ UserInputService.InputEnded:Connect(function(input)
         sprintInputHeld = false
     end
     if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = false end 
+end)
+
+Players.PlayerRemoving:Connect(function(v)
+    originalHRPProps[v] = nil
 end)
