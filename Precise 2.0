@@ -202,8 +202,8 @@ AddSlider(hTab, "P1 Size", "P1_Size", 1, 15)
 AddSlider(hTab, "P2 Size", "P2_Size", 1, 15)
 AddSlider(hTab, "P3 Size", "P3_Size", 1, 15)
 AddSlider(hTab, "P4 Size", "P4_Size", 1, 15)
-AddSlider(hTab, "Off_Size", "Off_Size", 1, 15) -- For Benji logic compatibility
-AddSlider(hTab, "Off_Trans", "Off_Trans", 0, 1)
+AddSlider(hTab, "Off_Size", "Smart Box Size", 1, 15) -- For Benji logic compatibility
+AddSlider(hTab, "Smart Box Transparency", "Off_Trans", 0, 1)
 
 -- STATS TAB
 AddToggle(sTab, "ANTI-STUN", "AntiWeave")
