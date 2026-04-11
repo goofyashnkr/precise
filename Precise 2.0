@@ -393,9 +393,7 @@ RunService.Heartbeat:Connect(function(dt)
                         if knockedVal and knockedVal.Value == true then isKnocked = true end
                     end
 
-                    local shouldApply = isWithinRange and (not Settings.SmartBox or not isKnocked)
-
-                    if shouldApply then
+                    if isWithinRange then
                         if not originalHRPProps[v] then
                             originalHRPProps[v] = {
                                 Size = tRoot.Size,
@@ -405,22 +403,40 @@ RunService.Heartbeat:Connect(function(dt)
                             }
                         end
 
-                        local sizeVal = Settings.HRP_Size
-                        local transVal = Settings.HRP_Trans
-                        
+                        -- SMART BOX LOGIC
+                        local shouldShowActiveHitbox = true
                         if isStomping then
-                            sizeVal = Settings.Stomp_HRP_Size
-                            transVal = Settings.Stomp_HRP_Trans
-                        elseif Settings.AI_Box_Enabled and activePunchType then
-                            sizeVal = Settings[activePunchType.."_Size"] or sizeVal
-                        elseif isTarget then
-                            sizeVal = Settings.Target_HRP_Size
-                            transVal = Settings.Target_HRP_Trans
+                            shouldShowActiveHitbox = true
+                        elseif Settings.SmartBox then
+                            if isKnocked then
+                                shouldShowActiveHitbox = false
+                            end
                         end
 
-                        tRoot.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
-                        tRoot.Transparency = transVal
-                        tRoot.Color = BlackColor
+                        if shouldShowActiveHitbox then
+                            local sizeVal = Settings.HRP_Size
+                            local transVal = Settings.HRP_Trans
+                            
+                            if isStomping then
+                                sizeVal = Settings.Stomp_HRP_Size
+                                transVal = Settings.Stomp_HRP_Trans
+                            elseif Settings.AI_Box_Enabled and activePunchType then
+                                sizeVal = Settings[activePunchType.."_Size"] or sizeVal
+                            elseif isTarget then
+                                sizeVal = Settings.Target_HRP_Size
+                                transVal = Settings.Target_HRP_Trans
+                            end
+
+                            tRoot.Size = Vector3.new(sizeVal, sizeVal, sizeVal)
+                            tRoot.Transparency = transVal
+                            tRoot.Color = BlackColor
+                        else
+                            -- APPLY OFF SETTINGS (Smart Box Effect)
+                            tRoot.Size = Vector3.new(Settings.Off_Size, Settings.Off_Size, Settings.Off_Size)
+                            tRoot.Transparency = Settings.Off_Trans
+                            tRoot.Color = originalHRPProps[v].Color
+                        end
+
                         tRoot.CanCollide = false
                         tRoot.CanTouch = true
                         tRoot.CanQuery = true
