@@ -40,7 +40,10 @@ local Settings = {
     AccentColor = Color3.fromRGB(0, 170, 255),
     GuiTransparency = 0.25,
     RenderDistance = 20,
-    HeadlessEnabled = false
+    HeadlessEnabled = false,
+    -- NEW SETTINGS
+    GlideEnabled = false,
+    GlidePower = 3.0
 }
 
 local originalHRPProps = {}
@@ -217,6 +220,9 @@ AddSlider(sTab, "Stomp Hitbox Transparency", "Stomp_HRP_Trans", 0, 1)
 AddToggle(mTab, "WS PROTECTION", "WS_Protection")
 AddToggle(mTab, "TP WALK (])", "TPWalkEnabled")
 AddSlider(mTab, "Walk Speed", "WalkSpeed", 5, 50, 100)
+-- NEW INTEGRATION
+AddToggle(mTab, "WEAVE GLIDE", "GlideEnabled")
+AddSlider(mTab, "Glide Distance", "GlidePower", 2.2, 10.0)
 
 -- CONFIGS TAB
 AddToggle(cTab, "HEADLESS", "HeadlessEnabled")
@@ -300,6 +306,32 @@ local function resetHRP(targetPlayer, char)
         end
     end
 end
+
+-- ==================================================================
+-- WEAVE GLIDE CORE LOGIC
+-- ==================================================================
+local function boostWeaveDistance(char)
+    local hrp = char:WaitForChild("HumanoidRootPart", 10)
+    if not hrp then return end
+
+    hrp.ChildAdded:Connect(function(child)
+        if child:IsA("BodyPosition") and child:GetAttribute("m") == 1 then
+            local currentPos = child.Position
+            local hrpPos = hrp.Position
+            local direction = currentPos - hrpPos
+            local originalDistance = direction.Magnitude
+
+            if originalDistance > 0 then
+                local unitDir = direction.Unit
+                local targetDistance = Settings.GlideEnabled and Settings.GlidePower or 2.2
+                child.Position = hrpPos + (unitDir * targetDistance)
+            end
+        end
+    end)
+end
+
+if LocalPlayer.Character then boostWeaveDistance(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(boostWeaveDistance)
 
 -- ==================================================================
 -- CORE LOGIC
