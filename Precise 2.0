@@ -2,10 +2,8 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
-
 local LocalPlayer = Players.LocalPlayer
 local ConfigFolder = "Precise2_Configs"
-
 if makefolder and not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 
 -- ==================================================================
@@ -14,8 +12,8 @@ if makefolder and not isfolder(ConfigFolder) then makefolder(ConfigFolder) end
 local Settings = {
     HRP_Size = 3,
     HRP_Trans = 0.8,
-    TargetPlayer = "", 
-    Target_HRP_Size = 6, 
+    TargetPlayer = "",
+    Target_HRP_Size = 6,
     Target_HRP_Trans = 0.5,
     Stomp_HRP_Size = 8,
     Stomp_HRP_Trans = 0.7,
@@ -24,16 +22,16 @@ local Settings = {
     P2_Size = 7,
     P3_Size = 8,
     P4_Size = 10,
-    Off_Size = 2, 
-    Off_Trans = 1, 
+    Off_Size = 2,
+    Off_Trans = 1,
     SolidToggle = false,
     Solid_Size = 5,
-    WalkSpeed = 11.5,            
-    WS_Protection = true,  
+    WalkSpeed = 11.5,               
+    WS_Protection = true, 
     AntiWeave = true,
     TPWalkEnabled = false,
-    SmartBox = false, 
-    PunchEnabled = false, 
+    SmartBox = false,
+    PunchEnabled = false,
     PunchSpeed = 1.7,
     StompSpeed = 1.0,
     MenuKey = Enum.KeyCode.M,
@@ -51,7 +49,6 @@ local selectionBoxCache = {}
 local lastHitboxUpdate = 0
 local hitboxUpdateRate = 0.08
 local BlackColor = Color3.new(0,0,0)
-
 local isTriggerHeld = false
 local activePunchType = nil 
 local sprintInputHeld = false 
@@ -64,7 +61,6 @@ local punchIDs = {
     ["rbxassetid://18312344029"] = true, ["rbxassetid://18312346524"] = true,
     ["rbxassetid://18312348771"] = true, ["rbxassetid://18312351760"] = true,
 }
-
 local stompIDs = {
     ["rbxassetid://17837722603"] = true,
     ["rbxassetid://18362264385"] = true,
@@ -97,6 +93,7 @@ ContentFrame.Size = UDim2.new(1, 0, 1, -185); ContentFrame.Position = UDim2.new(
 
 local DragHandle = Instance.new("Frame", MainFrame)
 DragHandle.Size = UDim2.new(1, 0, 0, 65); DragHandle.Position = UDim2.new(0, 0, 1, -65); DragHandle.BackgroundTransparency = 1
+
 local draggingGUI, dragStart, startPos = false, nil, nil
 DragHandle.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -119,8 +116,8 @@ local Pages, TabButtons, UIObjects = {}, {}, {}
 
 local function RefreshAllUI()
     MainFrame.BackgroundTransparency = Settings.GuiTransparency
-    for name, btn in pairs(TabButtons) do 
-        if Pages[name].Visible then btn.BackgroundColor3 = Settings.AccentColor end 
+    for name, btn in pairs(TabButtons) do
+        if Pages[name].Visible then btn.BackgroundColor3 = Settings.AccentColor end
     end
     for _, obj in pairs(UIObjects) do
         if obj.type == "Toggle" then
@@ -140,8 +137,16 @@ end
 local function CreateTab(name, index)
     local btn = Instance.new("TextButton", TabContainer)
     btn.Size = UDim2.new(0.24, 0, 1, 0); btn.Position = UDim2.new(index * 0.25, 0, 0, 0); btn.Text = name:upper(); btn.BackgroundColor3 = index == 0 and Settings.AccentColor or Color3.fromRGB(25,25,25); btn.TextColor3 = Color3.new(1,1,1); btn.Font = 17; btn.TextSize = 11; Instance.new("UICorner", btn)
-    local page = Instance.new("Frame", ContentFrame); page.Size = UDim2.new(1, -30, 1, 0); page.Position = UDim2.new(0, 15, 0, 0); page.BackgroundTransparency = 1; page.Visible = (index == 0)
-    Instance.new("UIListLayout", page).Padding = UDim.new(0, 6)
+    
+    local page = Instance.new("ScrollingFrame", ContentFrame)
+    page.Size = UDim2.new(1, -40, 1, 0); page.Position = UDim2.new(0, 20, 0, 0); page.BackgroundTransparency = 1; page.Visible = (index == 0)
+    page.ScrollBarThickness = 0; page.CanvasSize = UDim2.new(0,0,0,0)
+    
+    local layout = Instance.new("UIListLayout", page); layout.Padding = UDim.new(0, 6)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 20)
+    end)
+
     btn.MouseButton1Click:Connect(function()
         for _, p in pairs(Pages) do p.Visible = false end; for _, b in pairs(TabButtons) do b.BackgroundColor3 = Color3.fromRGB(25, 25, 25) end
         page.Visible = true; btn.BackgroundColor3 = Settings.AccentColor
@@ -156,30 +161,27 @@ local function AddSlider(parent, text, key, min, max, manualCap)
     local sBack = Instance.new("Frame", f); sBack.Size = UDim2.new(1, 0, 0, 4); sBack.Position = UDim2.new(0, 0, 0.75, 0); sBack.BackgroundColor3 = Color3.fromRGB(40,40,40); Instance.new("UICorner", sBack)
     local sFill = Instance.new("Frame", sBack); sFill.Size = UDim2.new(math.clamp((Settings[key]-min)/(max-min),0,1), 0, 1, 0); sFill.BackgroundColor3 = Settings.AccentColor; Instance.new("UICorner", sFill)
     local Thumb = Instance.new("Frame", sFill); Thumb.AnchorPoint = Vector2.new(0.5, 0.5); Thumb.Position = UDim2.new(1, 0, 0.5, 0); Thumb.Size = UDim2.new(0, 16, 0, 16); Thumb.BackgroundColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", Thumb)
-
+    
     local function update(val, isManual)
-        if not isManual then val = math.clamp(math.round(val * 10) / 10, min, max) 
+        if not isManual then val = math.clamp(math.round(val * 10) / 10, min, max)
         elseif manualCap then val = math.clamp(val, min, manualCap) end
         Settings[key] = val
         valInput.Text = tostring(val)
         sFill.Size = UDim2.new(math.clamp((val-min)/(max-min), 0, 1), 0, 1, 0)
         if key == "GuiTransparency" then MainFrame.BackgroundTransparency = val end
     end
-
     local dragging = false
     Thumb.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end end)
     UserInputService.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then update(min + (max - min) * math.clamp((i.Position.X - sBack.AbsolutePosition.X) / sBack.AbsoluteSize.X, 0, 1), false) end end)
     UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-    valInput.FocusLost:Connect(function() update(tonumber(valInput.Text) or Settings[key], true) end)
-    
+    valInput.FocusLost:Connect(function() update(tonumber(valInput.Text) or Settings[key], true) end)       
     table.insert(UIObjects, {type = "Slider", key = key, min = min, max = max, valInput = valInput, sFill = sFill})
 end
 
 local function AddToggle(parent, text, key)
     local btn = Instance.new("TextButton", parent); btn.Size = UDim2.new(1, 0, 0, 32); btn.TextColor3 = Color3.new(1,1,1); btn.Font = 17; btn.TextSize = 12; Instance.new("UICorner", btn)
     local function update() btn.Text = text..": "..(Settings[key] and "ON" or "OFF"); btn.BackgroundColor3 = Settings[key] and Settings.AccentColor or Color3.fromRGB(45,45,50) end
-    btn.MouseButton1Click:Connect(function() Settings[key] = not Settings[key] update() end); update()
-    
+    btn.MouseButton1Click:Connect(function() Settings[key] = not Settings[key] update() end); update()       
     table.insert(UIObjects, {type = "Toggle", key = key, btn = btn, rawText = text})
 end
 
@@ -187,8 +189,7 @@ local function AddInput(parent, text, key)
     local f = Instance.new("Frame", parent); f.Size = UDim2.new(1, 0, 0, 32); f.BackgroundTransparency = 1
     local lab = Instance.new("TextLabel", f); lab.Size = UDim2.new(0.4, 0, 1, 0); lab.Text = text; lab.TextColor3 = Color3.new(1,1,1); lab.Font = 17; lab.TextSize = 12; lab.TextXAlignment = 0; lab.BackgroundTransparency = 1
     local box = Instance.new("TextBox", f); box.Size = UDim2.new(0.55, 0, 1, 0); box.Position = UDim2.new(0.45, 0, 0, 0); box.Text = tostring(Settings[key]); box.BackgroundColor3 = Color3.fromRGB(20,20,20); box.TextColor3 = Color3.new(1,1,1); box.Font = 17; box.TextSize = 11; Instance.new("UICorner", box)
-    box.FocusLost:Connect(function() Settings[key] = box.Text end)
-    
+    box.FocusLost:Connect(function() Settings[key] = box.Text end)       
     table.insert(UIObjects, {type = "Input", key = key, box = box})
 end
 
@@ -225,7 +226,7 @@ AddSlider(mTab, "Walk Speed", "WalkSpeed", 5, 50, 100)
 AddToggle(mTab, "WEAVE GLIDE", "GlideEnabled")
 AddSlider(mTab, "Glide Distance", "GlidePower", 2.2, 10.0)
 
--- CONFIGS TAB
+-- CONFIGS TAB & MORPHER
 AddToggle(cTab, "HEADLESS", "HeadlessEnabled")
 AddSlider(cTab, "Menu Transparency", "GuiTransparency", 0, 1)
 AddSlider(cTab, "Hitbox Render", "RenderDistance", 5, 100)
@@ -233,39 +234,48 @@ AddInput(cTab, "Target User", "TargetPlayer")
 AddSlider(cTab, "Target Size", "Target_HRP_Size", 1, 15)
 AddSlider(cTab, "Target Transparency", "Target_HRP_Trans", 0, 1)
 
--- ==================================================================
--- MORPHER UI & LOGIC
--- ==================================================================
 local mDiv = Instance.new("TextLabel", cTab); mDiv.Size = UDim2.new(1,0,0,25); mDiv.Text = "--- SKIN MORPHER ---"; mDiv.TextColor3 = Color3.new(0.6,0.6,0.6); mDiv.Font = 17; mDiv.TextSize = 10; mDiv.BackgroundTransparency = 1
 local mBox = Instance.new("TextBox", cTab); mBox.Size = UDim2.new(1,0,0,35); mBox.PlaceholderText = "Username to Morph..."; mBox.BackgroundColor3 = Color3.fromRGB(20,20,20); mBox.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", mBox)
 local mBtn = Instance.new("TextButton", cTab); mBtn.Size = UDim2.new(1,0,0,35); mBtn.Text = "LOCAL MORPH SKIN"; mBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 110); mBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", mBtn)
 
-local function FixMorpher(targetName)
-    local success, targetUserId = pcall(function() return Players:GetUserIdFromNameAsync(targetName) end)
-    if not success or not targetUserId then return end
-    
+local function LocalMorph(targetUser)
+    local targetId = nil
+    pcall(function() targetId = Players:GetUserIdFromNameAsync(targetUser) end)
+    if not targetId then return end
     local char = LocalPlayer.Character
     if not char then return end
     
-    -- Clear current appearance locally
     for _, v in pairs(char:GetChildren()) do
-        if v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("CharacterMesh") or v:IsA("BodyColors") or v:IsA("ShirtGraphic") then
-            v:Destroy()
+        if v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("BodyColors") or v:IsA("ShirtGraphic") then v:Destroy() end
+    end
+    
+    task.spawn(function()
+        local appearance = Players:GetCharacterAppearanceAsync(targetId)
+        for _, item in pairs(appearance:GetChildren()) do
+            if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") then 
+                item.Parent = char
+            elseif item:IsA("Accessory") then
+                local handle = item:FindFirstChild("Handle")
+                if handle then
+                    local attach = handle:FindFirstChildOfClass("Attachment")
+                    if attach then
+                        local targetAttach = char:FindFirstChild(attach.Name, true)
+                        if targetAttach then
+                            item.Parent = char
+                            handle.CFrame = targetAttach.Parent.CFrame * targetAttach.CFrame * attach.CFrame:Inverse()
+                            local weld = Instance.new("WeldConstraint")
+                            weld.Part0 = handle; weld.Part1 = targetAttach.Parent; weld.Parent = handle
+                        end
+                    end
+                end
+            elseif item:IsA("Decal") and item.Name == "face" then 
+                if char:FindFirstChild("Head") then item.Parent = char.Head end 
+            end
         end
-    end
-
-    -- Apply target's appearance
-    local objects = Players:GetCharacterAppearanceAsync(targetUserId)
-    for _, obj in pairs(objects:GetChildren()) do
-        obj.Parent = char
-    end
+    end)
 end
+mBtn.MouseButton1Click:Connect(function() LocalMorph(mBox.Text) end)
 
-mBtn.MouseButton1Click:Connect(function()
-    FixMorpher(mBox.Text)
-end)
-
--- PRESETS & KEYBIND
 local bBtn = Instance.new("TextButton", cTab); bBtn.Size = UDim2.new(1,0,0,32); bBtn.Text = "KEYBIND: "..Settings.MenuKey.Name; bBtn.BackgroundColor3 = Color3.fromRGB(35,35,40); bBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", bBtn)
 local binding = false; bBtn.MouseButton1Click:Connect(function() binding = true bBtn.Text = "..." end)
 UserInputService.InputBegan:Connect(function(i,g) if binding then Settings.MenuKey = i.KeyCode; bBtn.Text = "KEYBIND: "..i.KeyCode.Name; binding = false end end)
@@ -274,9 +284,51 @@ local div = Instance.new("TextLabel", cTab); div.Size = UDim2.new(1,0,0,25); div
 local cfgBox = Instance.new("TextBox", cTab); cfgBox.Size = UDim2.new(1,0,0,35); cfgBox.PlaceholderText = "Config Name..."; cfgBox.BackgroundColor3 = Color3.fromRGB(20,20,20); cfgBox.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", cfgBox)
 local sBtn = Instance.new("TextButton", cTab); sBtn.Size = UDim2.new(1,0,0,35); sBtn.Text = "SAVE NEW PRESET"; sBtn.BackgroundColor3 = Color3.fromRGB(30, 90, 30); sBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", sBtn)
 
-local scrl = Instance.new("ScrollingFrame", cTab); scrl.Size = UDim2.new(1,0,0,200); scrl.BackgroundTransparency = 1; scrl.CanvasSize = UDim2.new(0,0,0,0); scrl.ScrollBarThickness = 2
-local sLayout = Instance.new("UIListLayout", scrl); sLayout.Padding = UDim.new(0, 5)
-sLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() scrl.CanvasSize = UDim2.new(0,0,0,sLayout.AbsoluteContentSize.Y) end)
+local scrl = Instance.new("ScrollingFrame", cTab); scrl.Size = UDim2.new(1,0,0,180); scrl.BackgroundTransparency = 1; scrl.CanvasSize = UDim2.new(0,0,0,0); scrl.ScrollBarThickness = 2
+local scrlLayout = Instance.new("UIListLayout", scrl); scrlLayout.Padding = UDim.new(0, 5)
+scrlLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() scrl.CanvasSize = UDim2.new(0,0,0,scrlLayout.AbsoluteContentSize.Y) end)
+
+local function LoadConfigs()
+    for _, v in pairs(scrl:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    if listfiles then
+        for _, file in pairs(listfiles(ConfigFolder)) do
+            local n = file:match("([^\\/%.]+)%.json$")
+            local f = Instance.new("Frame", scrl); f.Size = UDim2.new(1,-6,0,38); f.BackgroundColor3 = Color3.fromRGB(28,28,32); Instance.new("UICorner", f)
+            local t = Instance.new("TextLabel", f); t.Size = UDim2.new(0.4,0,1,0); t.Text = n; t.TextColor3 = Color3.new(1,1,1); t.BackgroundTransparency = 1; t.Position = UDim2.new(0,10,0,0); t.TextXAlignment = 0
+            local lB = Instance.new("TextButton", f); lB.Size = UDim2.new(0.25,0,0.7,0); lB.Position = UDim2.new(0.45,0,0.15,0); lB.Text = "LOAD"; lB.BackgroundColor3 = Color3.fromRGB(50,50,55); lB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", lB)
+            local dB = Instance.new("TextButton", f); dB.Size = UDim2.new(0.25,0,0.7,0); dB.Position = UDim2.new(0.72,0,0.15,0); dB.Text = "DEL"; dB.BackgroundColor3 = Color3.fromRGB(100,30,30); dB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", dB)
+                       
+            lB.MouseButton1Click:Connect(function()
+                local d = HttpService:JSONDecode(readfile(file))
+                for k, v in pairs(d) do
+                    if k == "AccentColor" then Settings[k] = Color3.new(v[1], v[2], v[3])
+                    elseif k == "MenuKey" then Settings[k] = Enum.KeyCode[v]
+                    else Settings[k] = v end
+                end
+                RefreshAllUI()
+            end)
+            dB.MouseButton1Click:Connect(function() delfile(file) f:Destroy() end)
+        end
+    end
+end
+sBtn.MouseButton1Click:Connect(function()
+    local d = {}
+    for k, v in pairs(Settings) do
+        if typeof(v) == "Color3" then d[k] = {v.R, v.G, v.B}
+        elseif typeof(v) == "EnumItem" then d[k] = v.Name
+        else d[k] = v end
+    end
+    writefile(ConfigFolder.."/"..(cfgBox.Text ~= "" and cfgBox.Text or "Preset")..".json", HttpService:JSONEncode(d))
+    LoadConfigs()
+end)
+LoadConfigs()
+
+local colors = {Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 100), Color3.fromRGB(255, 200, 50), Color3.fromRGB(180, 50, 255)}
+for _, cval in pairs(colors) do
+    local c = Instance.new("TextButton", ThemeFrame); c.Size = UDim2.new(0, 32, 0, 32); c.BackgroundColor3 = cval; c.Text = ""
+    Instance.new("UICorner", c).CornerRadius = UDim.new(0, 8)
+    c.MouseButton1Click:Connect(function() Settings.AccentColor = cval RefreshAllUI() end)
+end
 
 -- ==================================================================
 -- UTILITIES
@@ -293,7 +345,12 @@ local function resetHRP(targetPlayer, char)
     if props and char then
         local Root = char:FindFirstChild("HumanoidRootPart")
         if Root then
-            Root.Size = props.Size; Root.Transparency = props.Transparency; Root.CanCollide = props.CanCollide; Root.Color = props.Color
+            Root.Size = props.Size
+            Root.Transparency = props.Transparency
+            Root.CanCollide = props.CanCollide
+            Root.Color = props.Color
+            Root.CanTouch = true
+            Root.CanQuery = true
             local shell = Root:FindFirstChild("SolidShell")
             if shell then shell:Destroy() end
         end
@@ -306,10 +363,14 @@ local function boostWeaveDistance(char)
     if not hrp then return end
     hrp.ChildAdded:Connect(function(child)
         if child:IsA("BodyPosition") and child:GetAttribute("m") == 1 then
-            local currentPos = child.Position; local hrpPos = hrp.Position; local direction = (currentPos - hrpPos)
-            if direction.Magnitude > 0 then
+            local currentPos = child.Position
+            local hrpPos = hrp.Position
+            local direction = currentPos - hrpPos
+            local originalDistance = direction.Magnitude
+            if originalDistance > 0 then
+                local unitDir = direction.Unit
                 local targetDistance = Settings.GlideEnabled and Settings.GlidePower or 2.2
-                child.Position = hrpPos + (direction.Unit * targetDistance)
+                child.Position = hrpPos + (unitDir * targetDistance)
             end
         end
     end)
@@ -318,15 +379,14 @@ if LocalPlayer.Character then boostWeaveDistance(LocalPlayer.Character) end
 LocalPlayer.CharacterAdded:Connect(boostWeaveDistance)
 
 -- ==================================================================
--- CORE LOOP (SPRINT + PUNCH SPEED + HEADLESS)
+-- CORE LOGIC
 -- ==================================================================
 RunService.Heartbeat:Connect(function(dt)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
-
-    -- SPRINT CHECK
+       
     local specialID = "rbxassetid://127576302225448"
     local isSpecialAnimPlaying = false
     if animator then
@@ -334,21 +394,18 @@ RunService.Heartbeat:Connect(function(dt)
             if tostring(t.Animation.AnimationId) == specialID then isSpecialAnimPlaying = true break end
         end
     end
+    
     local shouldScriptControl = (Settings.WalkSpeed > 16) or (not (sprintInputHeld or isSpecialAnimPlaying))
-
-    -- HEADLESS PERSISTENCE
+    
     if char then
         local head = char:FindFirstChild("Head")
         if head then
             local t = Settings.HeadlessEnabled and 1 or 0
-            if head.Transparency ~= t then
-                head.Transparency = t
-                for _, v in pairs(head:GetDescendants()) do if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = t end end
-            end
+            head.Transparency = t
+            for _, v in pairs(head:GetDescendants()) do if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = t end end
         end
     end
-
-    -- MOVEMENT
+    
     if hum then
         if shouldScriptControl then
             local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
@@ -360,15 +417,16 @@ RunService.Heartbeat:Connect(function(dt)
             end
         end
     end
-
-    -- PUNCH & STOMP ANIMATION SPEEDS
+    
     local foundStomp = false
     activePunchType = nil
+       
     if animator then
         for _, t in ipairs(animator:GetPlayingAnimationTracks()) do
             local id = tostring(t.Animation.AnimationId):lower()
             if stompIDs[id] then
-                foundStomp = true; pcall(function() t:AdjustSpeed(Settings.StompSpeed) end)
+                foundStomp = true
+                pcall(function() t:AdjustSpeed(Settings.StompSpeed) end)
             elseif punchIDs[id] then
                 if typeof(punchIDs[id]) == "string" then activePunchType = punchIDs[id] end
                 if Settings.PunchEnabled then pcall(function() t:AdjustSpeed(Settings.PunchSpeed) end) end
@@ -378,104 +436,117 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
     isStomping = foundStomp
-
-    -- HITBOX UPDATE
+    
     lastHitboxUpdate = lastHitboxUpdate + dt
     if lastHitboxUpdate >= hitboxUpdateRate then
         lastHitboxUpdate = 0
         local liveFolder = workspace:FindFirstChild("Live")
+               
         for _, v in pairs(Players:GetPlayers()) do
             if v ~= LocalPlayer then
-                local tChar = v.Character; local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart"); local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+                local tChar = v.Character
+                local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+                local tHum = tChar and tChar:FindFirstChildOfClass("Humanoid")
+                               
                 if tRoot and tHum and myRoot then
                     local dist = (myRoot.Position - tRoot.Position).Magnitude
-                    if dist <= Settings.RenderDistance then
+                    local isWithinRange = (dist <= Settings.RenderDistance)
+                    local isTarget = (Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()))
+                                       
+                    local isKnocked = (tHum.Health <= 0)
+                    if not isKnocked and liveFolder then
+                        local entry = liveFolder:FindFirstChild(v.Name)
+                        local knockedVal = entry and entry:FindFirstChild("Knocked")
+                        if knockedVal and knockedVal.Value == true then isKnocked = true end
+                    end
+                    
+                    if isWithinRange then
                         if not originalHRPProps[v] then
-                            originalHRPProps[v] = {Size = tRoot.Size, Transparency = tRoot.Transparency, CanCollide = tRoot.CanCollide, Color = tRoot.Color}
+                            originalHRPProps[v] = {
+                                Size = tRoot.Size,
+                                Transparency = tRoot.Transparency,
+                                CanCollide = tRoot.CanCollide,
+                                Color = tRoot.Color
+                            }
                         end
-                        local isKnocked = (tHum.Health <= 0)
-                        if not isKnocked and liveFolder then
-                            local entry = liveFolder:FindFirstChild(v.Name)
-                            local knockedVal = entry and entry:FindFirstChild("Knocked")
-                            if knockedVal and knockedVal.Value == true then isKnocked = true end
-                        end
-                        local finalSize = Settings.HRP_Size; local finalTrans = Settings.HRP_Trans
+                        
+                        local finalSize = Settings.HRP_Size
+                        local finalTrans = Settings.HRP_Trans
+                        local finalColor = BlackColor
+                        
                         if isStomping then
-                            finalSize = Settings.Stomp_HRP_Size; finalTrans = Settings.Stomp_HRP_Trans
+                            finalSize = Settings.Stomp_HRP_Size
+                            finalTrans = Settings.Stomp_HRP_Trans
                         elseif Settings.SmartBox and isKnocked then
-                            finalSize = Settings.Off_Size; finalTrans = Settings.Off_Trans
+                            finalSize = Settings.Off_Size
+                            finalTrans = Settings.Off_Trans
                         elseif Settings.AI_Box_Enabled and activePunchType then
                             finalSize = Settings[activePunchType.."_Size"] or finalSize
-                        elseif Settings.TargetPlayer ~= "" and v.Name:lower():find(Settings.TargetPlayer:lower()) then
-                            finalSize = Settings.Target_HRP_Size; finalTrans = Settings.Target_HRP_Trans
+                        elseif isTarget then
+                            finalSize = Settings.Target_HRP_Size
+                            finalTrans = Settings.Target_HRP_Trans
                         end
+                        
                         tRoot.Size = Vector3.new(finalSize, finalSize, finalSize)
-                        tRoot.Transparency = finalTrans; tRoot.Color = BlackColor; tRoot.CanCollide = false
+                        tRoot.Transparency = finalTrans
+                        tRoot.Color = finalColor
+                        tRoot.CanCollide = false
+                        tRoot.CanTouch = true
+                        tRoot.CanQuery = true
+                        
                         if Settings.SelectionBoxEnabled then
                             local sb = selectionBoxCache[v]
-                            if not sb then sb = Instance.new("SelectionBox", tRoot); sb.Adornee = tRoot; sb.LineThickness = 0.02; selectionBoxCache[v] = sb end
+                            if not sb or sb.Parent ~= tRoot then
+                                removeSelectionBox(v)
+                                sb = Instance.new("SelectionBox")
+                                sb.Name = "VisualHitbox"
+                                sb.Adornee = tRoot
+                                sb.LineThickness = 0.02
+                                sb.SurfaceTransparency = 1
+                                sb.Parent = tRoot
+                                selectionBoxCache[v] = sb
+                            end
                             sb.Color3 = Settings.AccentColor
-                        else removeSelectionBox(v) end
-                    else resetHRP(v, tChar) end
+                        else
+                            removeSelectionBox(v)
+                        end
+                        
+                        local shell = tRoot:FindFirstChild("SolidShell")
+                        if Settings.SolidToggle then
+                            if not shell then
+                                shell = Instance.new("Part", tRoot)
+                                shell.Name = "SolidShell"
+                                shell.Transparency = 1
+                                shell.CanCollide = true
+                                shell.Massless = true
+                            end
+                            shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size)
+                            shell.CFrame = tRoot.CFrame
+                        elseif shell then shell:Destroy() end
+                    else
+                        resetHRP(v, tChar)
+                    end
                 end
             end
         end
     end
 end)
 
--- PRESET LOADING
-local function LoadConfigs()
-    for _, v in pairs(scrl:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
-    if listfiles then
-        for _, file in pairs(listfiles(ConfigFolder)) do
-            local n = file:match("([^\\/%.]+)%.json$")
-            local f = Instance.new("Frame", scrl); f.Size = UDim2.new(1,-6,0,38); f.BackgroundColor3 = Color3.fromRGB(28,28,32); Instance.new("UICorner", f)
-            local t = Instance.new("TextLabel", f); t.Size = UDim2.new(0.4,0,1,0); t.Text = n; t.TextColor3 = Color3.new(1,1,1); t.BackgroundTransparency = 1; t.Position = UDim2.new(0,10,0,0); t.TextXAlignment = 0
-            local lB = Instance.new("TextButton", f); lB.Size = UDim2.new(0.25,0,0.7,0); lB.Position = UDim2.new(0.45,0,0.15,0); lB.Text = "LOAD"; lB.BackgroundColor3 = Color3.fromRGB(50,50,55); lB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", lB)
-            local dB = Instance.new("TextButton", f); dB.Size = UDim2.new(0.25,0,0.7,0); dB.Position = UDim2.new(0.72,0,0.15,0); dB.Text = "DEL"; dB.BackgroundColor3 = Color3.fromRGB(100,30,30); dB.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", dB)
-            lB.MouseButton1Click:Connect(function()
-                local d = HttpService:JSONDecode(readfile(file))
-                for k, v in pairs(d) do 
-                    if k == "AccentColor" then Settings[k] = Color3.new(v[1], v[2], v[3]) 
-                    elseif k == "MenuKey" then Settings[k] = Enum.KeyCode[v] 
-                    else Settings[k] = v end 
-                end
-                RefreshAllUI() 
-            end)
-            dB.MouseButton1Click:Connect(function() delfile(file) f:Destroy() end)
-        end
-    end
-end
-
-sBtn.MouseButton1Click:Connect(function()
-    local d = {}
-    for k, v in pairs(Settings) do 
-        if typeof(v) == "Color3" then d[k] = {v.R, v.G, v.B} 
-        elseif typeof(v) == "EnumItem" then d[k] = v.Name 
-        else d[k] = v end 
-    end
-    writefile(ConfigFolder.."/"..(cfgBox.Text ~= "" and cfgBox.Text or "Preset")..".json", HttpService:JSONEncode(d))
-    LoadConfigs()
-end)
-LoadConfigs()
-
--- COLORS
-local colors = {Color3.fromRGB(0, 170, 255), Color3.fromRGB(255, 50, 50), Color3.fromRGB(50, 255, 100), Color3.fromRGB(255, 200, 50), Color3.fromRGB(180, 50, 255)}
-for _, cval in pairs(colors) do
-    local c = Instance.new("TextButton", ThemeFrame); c.Size = UDim2.new(0, 32, 0, 32); c.BackgroundColor3 = cval; c.Text = ""
-    Instance.new("UICorner", c).CornerRadius = UDim.new(0, 8)
-    c.MouseButton1Click:Connect(function() Settings.AccentColor = cval RefreshAllUI() end)
-end
-
--- INPUT HANDLING
+-- Input Handling
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.LeftShift then sprintInputHeld = true end
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then sprintInputHeld = true end
     if input.KeyCode == Settings.MenuKey then MainFrame.Visible = not MainFrame.Visible end
-    if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = true end
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = true end
     if input.KeyCode == Enum.KeyCode.RightBracket then Settings.TPWalkEnabled = not Settings.TPWalkEnabled end
 end)
-UserInputService.InputEnded:Connect(function(input) 
-    if input.KeyCode == Enum.KeyCode.LeftShift then sprintInputHeld = false end
-    if input.KeyCode == Enum.KeyCode.Space then isTriggerHeld = false end 
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then sprintInputHeld = false end
+    if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = false end 
+end)
+
+Players.PlayerRemoving:Connect(function(v)
+    originalHRPProps[v] = nil
+    removeSelectionBox(v)
 end)
