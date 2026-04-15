@@ -155,12 +155,47 @@ local function CreateTab(name, index)
 end
 
 local function AddSlider(parent, text, key, min, max, manualCap)
-    local f = Instance.new("Frame", parent); f.Size = UDim2.new(1, 0, 0, 45); f.BackgroundTransparency = 1
-    local lab = Instance.new("TextLabel", f); lab.Size = UDim2.new(0.6, 0, 0.4, 0); lab.Text = text; lab.TextColor3 = Color3.new(1,1,1); lab.Font = 17; lab.TextSize = 12; lab.TextXAlignment = 0; lab.BackgroundTransparency = 1
-    local valInput = Instance.new("TextBox", f); valInput.Size = UDim2.new(0.3, 0, 0.4, 0); valInput.Position = UDim2.new(0.7, 0, 0, 0); valInput.Text = tostring(Settings[key]); valInput.BackgroundTransparency = 1; valInput.TextColor3 = Color3.new(1,1,1); valInput.Font = 17; valInput.TextSize = 12; valInput.TextXAlignment = 2
-    local sBack = Instance.new("Frame", f); sBack.Size = UDim2.new(1, 0, 0, 4); sBack.Position = UDim2.new(0, 0, 0.75, 0); sBack.BackgroundColor3 = Color3.fromRGB(40,40,40); Instance.new("UICorner", sBack)
-    local sFill = Instance.new("Frame", sBack); sFill.Size = UDim2.new(math.clamp((Settings[key]-min)/(max-min),0,1), 0, 1, 0); sFill.BackgroundColor3 = Settings.AccentColor; Instance.new("UICorner", sFill)
-    local Thumb = Instance.new("Frame", sFill); Thumb.AnchorPoint = Vector2.new(0.5, 0.5); Thumb.Position = UDim2.new(1, 0, 0.5, 0); Thumb.Size = UDim2.new(0, 16, 0, 16); Thumb.BackgroundColor3 = Color3.new(1, 1, 1); Instance.new("UICorner", Thumb)
+    local f = Instance.new("Frame", parent)
+    f.Size = UDim2.new(1, 0, 0, 45)
+    f.BackgroundTransparency = 1
+    
+    local lab = Instance.new("TextLabel", f)
+    lab.Size = UDim2.new(0.6, 0, 0.4, 0)
+    lab.Text = text
+    lab.TextColor3 = Color3.new(1,1,1)
+    lab.Font = 17
+    lab.TextSize = 12
+    lab.TextXAlignment = 0
+    lab.BackgroundTransparency = 1
+    
+    local valInput = Instance.new("TextBox", f)
+    valInput.Size = UDim2.new(0.3, 0, 0.4, 0)
+    valInput.Position = UDim2.new(0.7, 0, 0, 0)
+    valInput.Text = tostring(Settings[key])
+    valInput.BackgroundTransparency = 1
+    valInput.TextColor3 = Color3.new(1,1,1)
+    valInput.Font = 17
+    valInput.TextSize = 12
+    valInput.TextXAlignment = 2
+    
+    -- Added 10px padding on left/right to prevent knob clipping
+    local sBack = Instance.new("Frame", f)
+    sBack.Size = UDim2.new(1, -20, 0, 4)
+    sBack.Position = UDim2.new(0, 10, 0.75, 0) 
+    sBack.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    Instance.new("UICorner", sBack)
+    
+    local sFill = Instance.new("Frame", sBack)
+    sFill.Size = UDim2.new(math.clamp((Settings[key]-min)/(max-min),0,1), 0, 1, 0)
+    sFill.BackgroundColor3 = Settings.AccentColor
+    Instance.new("UICorner", sFill)
+    
+    local Thumb = Instance.new("Frame", sFill)
+    Thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+    Thumb.Position = UDim2.new(1, 0, 0.5, 0)
+    Thumb.Size = UDim2.new(0, 16, 0, 16)
+    Thumb.BackgroundColor3 = Color3.new(1, 1, 1)
+    Instance.new("UICorner", Thumb)
     
     local function update(val, isManual)
         if not isManual then val = math.clamp(math.round(val * 10) / 10, min, max)
@@ -170,9 +205,14 @@ local function AddSlider(parent, text, key, min, max, manualCap)
         sFill.Size = UDim2.new(math.clamp((val-min)/(max-min), 0, 1), 0, 1, 0)
         if key == "GuiTransparency" then MainFrame.BackgroundTransparency = val end
     end
+    
     local dragging = false
     Thumb.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end end)
-    UserInputService.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then update(min + (max - min) * math.clamp((i.Position.X - sBack.AbsolutePosition.X) / sBack.AbsoluteSize.X, 0, 1), false) end end)
+    UserInputService.InputChanged:Connect(function(i) 
+        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then 
+            update(min + (max - min) * math.clamp((i.Position.X - sBack.AbsolutePosition.X) / sBack.AbsoluteSize.X, 0, 1), false) 
+        end 
+    end)
     UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
     valInput.FocusLost:Connect(function() update(tonumber(valInput.Text) or Settings[key], true) end)       
     table.insert(UIObjects, {type = "Slider", key = key, min = min, max = max, valInput = valInput, sFill = sFill})
@@ -263,6 +303,16 @@ local function LocalMorph(targetUser)
                         if targetAttach then
                             item.Parent = char
                             handle.CFrame = targetAttach.Parent.CFrame * targetAttach.CFrame * attach.CFrame:Inverse()
+                            handle.CanCollide = false
+                            handle.CanTouch = false
+                            handle.CanQuery = false
+                            for _, p in pairs(item:GetDescendants()) do
+                                if p:IsA("BasePart") then
+                                    p.CanCollide = false
+                                    p.CanTouch = false
+                                    p.CanQuery = false
+                                end
+                            end
                             local weld = Instance.new("WeldConstraint")
                             weld.Part0 = handle; weld.Part1 = targetAttach.Parent; weld.Parent = handle
                         end
@@ -331,7 +381,7 @@ for _, cval in pairs(colors) do
 end
 
 -- ==================================================================
--- UTILITIES
+-- UTILITIES & CORE LOOPS
 -- ==================================================================
 local function removeSelectionBox(targetPlayer)
     if selectionBoxCache[targetPlayer] then
@@ -378,9 +428,6 @@ end
 if LocalPlayer.Character then boostWeaveDistance(LocalPlayer.Character) end
 LocalPlayer.CharacterAdded:Connect(boostWeaveDistance)
 
--- ==================================================================
--- CORE LOGIC
--- ==================================================================
 RunService.Heartbeat:Connect(function(dt)
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -532,7 +579,6 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- Input Handling
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then sprintInputHeld = true end
