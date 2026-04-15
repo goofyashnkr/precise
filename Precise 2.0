@@ -411,6 +411,22 @@ RunService.Heartbeat:Connect(function(dt)
                 if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then child:Destroy() end
             end
         end
+        
+        -- Animation/Speed Logic
+        isStomping = false
+        activePunchType = nil
+        if animator then
+            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                if punchIDs[track.Animation.AnimationId] then
+                    activePunchType = punchIDs[track.Animation.AnimationId]
+                    if Settings.PunchEnabled then track:AdjustSpeed(Settings.PunchSpeed) end
+                end
+                if stompIDs[track.Animation.AnimationId] then
+                    isStomping = true
+                    track:AdjustSpeed(Settings.StompSpeed)
+                end
+            end
+        end
     end
 
     -- Hitbox Logic
@@ -428,17 +444,56 @@ RunService.Heartbeat:Connect(function(dt)
                         if not originalHRPProps[v] then
                             originalHRPProps[v] = {Size = tRoot.Size, Transparency = tRoot.Transparency, CanCollide = tRoot.CanCollide, Color = tRoot.Color}
                         end
-                        local finalSize = Settings.HRP_Size
-                        tRoot.Size = Vector3.new(finalSize, finalSize, finalSize)
-                        tRoot.Transparency = Settings.HRP_Trans
-                        tRoot.CanCollide = false
                         
+                        local finalSize = Settings.HRP_Size
+                        local finalTrans = Settings.HRP_Trans
+                        
+                        if isStomping then
+                            finalSize = Settings.Stomp_HRP_Size
+                            finalTrans = Settings.Stomp_HRP_Trans
+                        elseif activePunchType == "P1" then finalSize = Settings.P1_Size
+                        elseif activePunchType == "P2" then finalSize = Settings.P2_Size
+                        elseif activePunchType == "P3" then finalSize = Settings.P3_Size
+                        elseif activePunchType == "P4" then finalSize = Settings.P4_Size
+                        elseif Settings.TargetPlayer ~= "" and (v.Name:lower():find(Settings.TargetPlayer:lower()) or v.DisplayName:lower():find(Settings.TargetPlayer:lower())) then
+                            finalSize = Settings.Target_HRP_Size
+                            finalTrans = Settings.Target_HRP_Trans
+                        elseif Settings.SmartBox and activePunchType == nil and not isStomping then
+                            finalSize = Settings.Off_Size
+                            finalTrans = Settings.Off_Trans
+                        end
+                        
+                        if Settings.AI_Box_Enabled and v:FindFirstChild("Target") then
+                            finalSize = 12
+                        end
+
+                        tRoot.Size = Vector3.new(finalSize, finalSize, finalSize)
+                        tRoot.Transparency = finalTrans
+                        tRoot.CanCollide = false
+                        tRoot.CanTouch = true
+                        tRoot.CanQuery = true
+                        
+                        -- Solid Shell
+                        local shell = tRoot:FindFirstChild("SolidShell")
+                        if Settings.SolidToggle then
+                            if not shell then
+                                shell = Instance.new("Part", tRoot); shell.Name = "SolidShell"; shell.Shape = Enum.PartType.Ball; shell.Transparency = 1; shell.CanCollide = true; shell.CanTouch = false; shell.CanQuery = false
+                                local weld = Instance.new("Weld", shell); weld.Part0 = tRoot; weld.Part1 = shell
+                            end
+                            shell.Size = Vector3.new(Settings.Solid_Size, Settings.Solid_Size, Settings.Solid_Size)
+                        elseif shell then
+                            shell:Destroy()
+                        end
+
                         if Settings.SelectionBoxEnabled then
                             local sb = selectionBoxCache[v]
                             if not sb then
                                 sb = Instance.new("SelectionBox", tRoot); sb.Adornee = tRoot; sb.LineThickness = 0.02; selectionBoxCache[v] = sb
                             end
-                            sb.Color3 = Settings.AccentColor
+                            sb.Color3 = (Settings.TargetPlayer ~= "" and (v.Name:lower():find(Settings.TargetPlayer:lower()) or v.DisplayName:lower():find(Settings.TargetPlayer:lower()))) and Color3.new(1,0,0) or Settings.AccentColor
+                            sb.SurfaceColor3 = sb.Color3
+                        elseif selectionBoxCache[v] then
+                            removeSelectionBox(v)
                         end
                     else
                         resetHRP(v, tChar)
