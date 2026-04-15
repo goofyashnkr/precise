@@ -28,7 +28,7 @@ local Settings = {
     Off_Trans = 1, 
     SolidToggle = false,
     Solid_Size = 5,
-    WalkSpeed = 11.5,           
+    WalkSpeed = 11.5,            
     WS_Protection = true,  
     AntiWeave = true,
     TPWalkEnabled = false,
@@ -43,10 +43,12 @@ local Settings = {
     HeadlessEnabled = false,
     -- NEW SETTINGS
     GlideEnabled = false,
-    GlidePower = 3.0
+    GlidePower = 3.0,
+    SelectionBoxEnabled = true 
 }
 
 local originalHRPProps = {}
+local selectionBoxCache = {} 
 local lastHitboxUpdate = 0
 local hitboxUpdateRate = 0.08
 local BlackColor = Color3.new(0,0,0)
@@ -139,8 +141,16 @@ end
 local function CreateTab(name, index)
     local btn = Instance.new("TextButton", TabContainer)
     btn.Size = UDim2.new(0.24, 0, 1, 0); btn.Position = UDim2.new(index * 0.25, 0, 0, 0); btn.Text = name:upper(); btn.BackgroundColor3 = index == 0 and Settings.AccentColor or Color3.fromRGB(25,25,25); btn.TextColor3 = Color3.new(1,1,1); btn.Font = 17; btn.TextSize = 11; Instance.new("UICorner", btn)
-    local page = Instance.new("Frame", ContentFrame); page.Size = UDim2.new(1, -30, 1, 0); page.Position = UDim2.new(0, 15, 0, 0); page.BackgroundTransparency = 1; page.Visible = (index == 0)
-    Instance.new("UIListLayout", page).Padding = UDim.new(0, 6)
+    
+    local page = Instance.new("ScrollingFrame", ContentFrame)
+    page.Size = UDim2.new(1, -40, 1, 0); page.Position = UDim2.new(0, 20, 0, 0); page.BackgroundTransparency = 1; page.Visible = (index == 0)
+    page.ScrollBarThickness = 0; page.CanvasSize = UDim2.new(0,0,0,0)
+    
+    local layout = Instance.new("UIListLayout", page); layout.Padding = UDim.new(0, 6)
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() 
+        page.CanvasSize = UDim2.new(0,0,0,layout.AbsoluteContentSize.Y + 20) 
+    end)
+
     btn.MouseButton1Click:Connect(function()
         for _, p in pairs(Pages) do p.Visible = false end; for _, b in pairs(TabButtons) do b.BackgroundColor3 = Color3.fromRGB(25, 25, 25) end
         page.Visible = true; btn.BackgroundColor3 = Settings.AccentColor
@@ -195,6 +205,7 @@ end
 local hTab = CreateTab("Hitbox", 0); local sTab = CreateTab("Stats", 1); local mTab = CreateTab("Move", 2); local cTab = CreateTab("Configs", 3)
 
 -- HITBOX TAB
+AddToggle(hTab, "VISUAL BOX", "SelectionBoxEnabled")
 AddToggle(hTab, "SMART BOX", "SmartBox")
 AddToggle(hTab, "AI HITBOX", "AI_Box_Enabled")
 AddToggle(hTab, "SOLID SHELL", "SolidToggle")
@@ -220,11 +231,10 @@ AddSlider(sTab, "Stomp Hitbox Transparency", "Stomp_HRP_Trans", 0, 1)
 AddToggle(mTab, "WS PROTECTION", "WS_Protection")
 AddToggle(mTab, "TP WALK (])", "TPWalkEnabled")
 AddSlider(mTab, "Walk Speed", "WalkSpeed", 5, 50, 100)
--- NEW INTEGRATION
 AddToggle(mTab, "WEAVE GLIDE", "GlideEnabled")
 AddSlider(mTab, "Glide Distance", "GlidePower", 2.2, 10.0)
 
--- CONFIGS TAB
+-- CONFIGS TAB & SKIN MORPHER
 AddToggle(cTab, "HEADLESS", "HeadlessEnabled")
 AddSlider(cTab, "Menu Transparency", "GuiTransparency", 0, 1)
 AddSlider(cTab, "Hitbox Render", "RenderDistance", 5, 100)
@@ -232,7 +242,46 @@ AddInput(cTab, "Target User", "TargetPlayer")
 AddSlider(cTab, "Target Size", "Target_HRP_Size", 1, 15)
 AddSlider(cTab, "Target Transparency", "Target_HRP_Trans", 0, 1)
 
--- Preset Logic
+-- Morph UI Integration
+local mDiv = Instance.new("TextLabel", cTab); mDiv.Size = UDim2.new(1,0,0,25); mDiv.Text = "--- SKIN MORPHER ---"; mDiv.TextColor3 = Color3.new(0.6,0.6,0.6); mDiv.Font = 17; mDiv.TextSize = 10; mDiv.BackgroundTransparency = 1
+local mBox = Instance.new("TextBox", cTab); mBox.Size = UDim2.new(1,0,0,35); mBox.PlaceholderText = "Username..."; mBox.BackgroundColor3 = Color3.fromRGB(20,20,20); mBox.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", mBox)
+local mBtn = Instance.new("TextButton", cTab); mBtn.Size = UDim2.new(1,0,0,35); mBtn.Text = "LOCAL MORPH SKIN"; mBtn.BackgroundColor3 = Color3.fromRGB(60, 40, 110); mBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", mBtn)
+
+-- Morph Logic Function
+local function LocalMorph(targetUser)
+    local targetId = nil
+    pcall(function() targetId = Players:GetUserIdFromNameAsync(targetUser) end)
+    if not targetId then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    for _, v in pairs(char:GetChildren()) do
+        if v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("BodyColors") or v:IsA("ShirtGraphic") then v:Destroy() end
+    end
+    task.spawn(function()
+        local appearance = Players:GetCharacterAppearanceAsync(targetId)
+        for _, item in pairs(appearance:GetChildren()) do
+            if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") then item.Parent = char
+            elseif item:IsA("Accessory") then
+                local handle = item:FindFirstChild("Handle")
+                if handle then
+                    local attach = handle:FindFirstChildOfClass("Attachment")
+                    if attach then
+                        local targetAttach = char:FindFirstChild(attach.Name, true)
+                        if targetAttach then
+                            item.Parent = char
+                            handle.CFrame = targetAttach.Parent.CFrame * targetAttach.CFrame * attach.CFrame:Inverse()
+                            local weld = Instance.new("WeldConstraint")
+                            weld.Part0 = handle; weld.Part1 = targetAttach.Parent; weld.Parent = handle
+                        end
+                    end
+                end
+            elseif item:IsA("Decal") and item.Name == "face" then if char:FindFirstChild("Head") then item.Parent = char.Head end end
+        end
+    end)
+end
+mBtn.MouseButton1Click:Connect(function() LocalMorph(mBox.Text) end)
+
+-- Keybind & Preset Management
 local bBtn = Instance.new("TextButton", cTab); bBtn.Size = UDim2.new(1,0,0,32); bBtn.Text = "KEYBIND: "..Settings.MenuKey.Name; bBtn.BackgroundColor3 = Color3.fromRGB(35,35,40); bBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", bBtn)
 local binding = false; bBtn.MouseButton1Click:Connect(function() binding = true bBtn.Text = "..." end)
 UserInputService.InputBegan:Connect(function(i,g) if binding then Settings.MenuKey = i.KeyCode; bBtn.Text = "KEYBIND: "..i.KeyCode.Name; binding = false end end)
@@ -241,8 +290,9 @@ local div = Instance.new("TextLabel", cTab); div.Size = UDim2.new(1,0,0,25); div
 local cfgBox = Instance.new("TextBox", cTab); cfgBox.Size = UDim2.new(1,0,0,35); cfgBox.PlaceholderText = "Config Name..."; cfgBox.BackgroundColor3 = Color3.fromRGB(20,20,20); cfgBox.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", cfgBox)
 local sBtn = Instance.new("TextButton", cTab); sBtn.Size = UDim2.new(1,0,0,35); sBtn.Text = "SAVE NEW PRESET"; sBtn.BackgroundColor3 = Color3.fromRGB(30, 90, 30); sBtn.TextColor3 = Color3.new(1,1,1); Instance.new("UICorner", sBtn)
 
-local scrl = Instance.new("ScrollingFrame", cTab); scrl.Size = UDim2.new(1,0,1,-520); scrl.BackgroundTransparency = 1; scrl.CanvasSize = UDim2.new(0,0,0,0); scrl.ScrollBarThickness = 2
-Instance.new("UIListLayout", scrl).Padding = UDim.new(0, 5)
+local scrl = Instance.new("ScrollingFrame", cTab); scrl.Size = UDim2.new(1,0,0,180); scrl.BackgroundTransparency = 1; scrl.CanvasSize = UDim2.new(0,0,0,0); scrl.ScrollBarThickness = 2
+local scrlLayout = Instance.new("UIListLayout", scrl); scrlLayout.Padding = UDim.new(0, 5)
+scrlLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() scrl.CanvasSize = UDim2.new(0,0,0,scrlLayout.AbsoluteContentSize.Y) end)
 
 local function LoadConfigs()
     for _, v in pairs(scrl:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
@@ -290,6 +340,13 @@ end
 -- ==================================================================
 -- UTILITIES
 -- ==================================================================
+local function removeSelectionBox(targetPlayer)
+    if selectionBoxCache[targetPlayer] then
+        pcall(function() selectionBoxCache[targetPlayer]:Destroy() end)
+        selectionBoxCache[targetPlayer] = nil
+    end
+end
+
 local function resetHRP(targetPlayer, char)
     local props = originalHRPProps[targetPlayer]
     if props and char then
@@ -305,11 +362,9 @@ local function resetHRP(targetPlayer, char)
             if shell then shell:Destroy() end
         end
     end
+    removeSelectionBox(targetPlayer)
 end
 
--- ==================================================================
--- WEAVE GLIDE CORE LOGIC
--- ==================================================================
 local function boostWeaveDistance(char)
     local hrp = char:WaitForChild("HumanoidRootPart", 10)
     if not hrp then return end
@@ -342,7 +397,6 @@ RunService.Heartbeat:Connect(function(dt)
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
     
-    -- SPRINT CHECK
     local specialID = "rbxassetid://127576302225448"
     local isSpecialAnimPlaying = false
     if animator then
@@ -353,7 +407,6 @@ RunService.Heartbeat:Connect(function(dt)
 
     local shouldScriptControl = (Settings.WalkSpeed > 16) or (not (sprintInputHeld or isSpecialAnimPlaying))
 
-    -- HEADLESS LOGIC
     if char then
         local head = char:FindFirstChild("Head")
         if head then
@@ -363,7 +416,6 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- MOVEMENT LOGIC
     if hum then
         if shouldScriptControl then
             local targetSpeed = Settings.TPWalkEnabled and TP_SPEED or Settings.WalkSpeed
@@ -376,7 +428,6 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ANIMATION SPEEDS
     local foundStomp = false
     activePunchType = nil
     
@@ -396,9 +447,6 @@ RunService.Heartbeat:Connect(function(dt)
     end
     isStomping = foundStomp
 
-    -- ==============================================================
-    -- BENJI HITBOX + SMART BOX INTEGRATION
-    -- ==============================================================
     lastHitboxUpdate = lastHitboxUpdate + dt
     if lastHitboxUpdate >= hitboxUpdateRate then
         lastHitboxUpdate = 0
@@ -432,12 +480,10 @@ RunService.Heartbeat:Connect(function(dt)
                             }
                         end
 
-                        -- Logic Selection
                         local finalSize = Settings.HRP_Size
                         local finalTrans = Settings.HRP_Trans
-                        local finalColor = BlackColor -- Global hitbox look
+                        local finalColor = BlackColor 
 
-                        -- Priority Order: Stomp > SmartBox > AI > Target > Global
                         if isStomping then
                             finalSize = Settings.Stomp_HRP_Size
                             finalTrans = Settings.Stomp_HRP_Trans
@@ -451,7 +497,6 @@ RunService.Heartbeat:Connect(function(dt)
                             finalTrans = Settings.Target_HRP_Trans
                         end
 
-                        -- Apply values
                         tRoot.Size = Vector3.new(finalSize, finalSize, finalSize)
                         tRoot.Transparency = finalTrans
                         tRoot.Color = finalColor
@@ -459,7 +504,23 @@ RunService.Heartbeat:Connect(function(dt)
                         tRoot.CanTouch = true
                         tRoot.CanQuery = true
 
-                        -- Solid Shell
+                        if Settings.SelectionBoxEnabled then
+                            local sb = selectionBoxCache[v]
+                            if not sb or sb.Parent ~= tRoot then
+                                removeSelectionBox(v)
+                                sb = Instance.new("SelectionBox")
+                                sb.Name = "VisualHitbox"
+                                sb.Adornee = tRoot
+                                sb.LineThickness = 0.02
+                                sb.SurfaceTransparency = 1
+                                sb.Parent = tRoot
+                                selectionBoxCache[v] = sb
+                            end
+                            sb.Color3 = Settings.AccentColor
+                        else
+                            removeSelectionBox(v)
+                        end
+
                         local shell = tRoot:FindFirstChild("SolidShell")
                         if Settings.SolidToggle then
                             if not shell then
@@ -481,26 +542,21 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ==================================================================
--- INPUT HANDLING
--- ==================================================================
+-- Input Handling
 UserInputService.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
-        sprintInputHeld = true
-    end
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then sprintInputHeld = true end
     if input.KeyCode == Settings.MenuKey then MainFrame.Visible = not MainFrame.Visible end
     if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = true end
     if input.KeyCode == Enum.KeyCode.RightBracket then Settings.TPWalkEnabled = not Settings.TPWalkEnabled end
 end)
 
 UserInputService.InputEnded:Connect(function(input) 
-    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then
-        sprintInputHeld = false
-    end
+    if input.KeyCode == Enum.KeyCode.LeftShift or input.KeyCode == Enum.KeyCode.ButtonL3 then sprintInputHeld = false end
     if input.KeyCode == Enum.KeyCode.Space or input.KeyCode == Enum.KeyCode.ButtonL2 then isTriggerHeld = false end 
 end)
 
 Players.PlayerRemoving:Connect(function(v)
     originalHRPProps[v] = nil
+    removeSelectionBox(v)
 end)
