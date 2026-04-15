@@ -387,7 +387,7 @@ RunService.Heartbeat:Connect(function(dt)
     local myRoot = char and char:FindFirstChild("HumanoidRootPart")
     local animator = hum and hum:FindFirstChildOfClass("Animator")
     
-    -- PERSISTENT HEADLESS
+    -- PERSISTENT HEADLESS ADDITION
     if char then
         local head = char:FindFirstChild("Head")
         if head then
@@ -411,8 +411,8 @@ RunService.Heartbeat:Connect(function(dt)
                 if table.find({"WeaveStun", "Stun", "Slow", "Weight"}, child.Name) then child:Destroy() end
             end
         end
-        
-        -- Animation/Speed Logic
+
+        -- ANIMATION SPEED LOGIC (Original)
         isStomping = false
         activePunchType = nil
         if animator then
@@ -445,6 +445,7 @@ RunService.Heartbeat:Connect(function(dt)
                             originalHRPProps[v] = {Size = tRoot.Size, Transparency = tRoot.Transparency, CanCollide = tRoot.CanCollide, Color = tRoot.Color}
                         end
                         
+                        -- Priority Hierarchy Logic (Original)
                         local finalSize = Settings.HRP_Size
                         local finalTrans = Settings.HRP_Trans
                         
@@ -472,8 +473,8 @@ RunService.Heartbeat:Connect(function(dt)
                         tRoot.CanCollide = false
                         tRoot.CanTouch = true
                         tRoot.CanQuery = true
-                        
-                        -- Solid Shell
+
+                        -- Solid Shell (Original)
                         local shell = tRoot:FindFirstChild("SolidShell")
                         if Settings.SolidToggle then
                             if not shell then
@@ -484,16 +485,13 @@ RunService.Heartbeat:Connect(function(dt)
                         elseif shell then
                             shell:Destroy()
                         end
-
+                        
                         if Settings.SelectionBoxEnabled then
                             local sb = selectionBoxCache[v]
                             if not sb then
                                 sb = Instance.new("SelectionBox", tRoot); sb.Adornee = tRoot; sb.LineThickness = 0.02; selectionBoxCache[v] = sb
                             end
                             sb.Color3 = (Settings.TargetPlayer ~= "" and (v.Name:lower():find(Settings.TargetPlayer:lower()) or v.DisplayName:lower():find(Settings.TargetPlayer:lower()))) and Color3.new(1,0,0) or Settings.AccentColor
-                            sb.SurfaceColor3 = sb.Color3
-                        elseif selectionBoxCache[v] then
-                            removeSelectionBox(v)
                         end
                     else
                         resetHRP(v, tChar)
