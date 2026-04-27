@@ -5,7 +5,7 @@ local Success, KeyData = pcall(function()
     return game:HttpGet("https://raw.githubusercontent.com/goofyashnkr/Linear/refs/heads/main/KEYS")
 end)
 
-local PRECISE_LOADSTRING = [[ loadstring(game:HttpGet("https://raw.githubusercontent.com/goofyashnkr/precise/refs/heads/main/PRECISE))() ]]
+local PRECISE_LOADSTRING = [[ loadstring(game:HttpGet("https://raw.githubusercontent.com/goofyashnkr/precise/refs/heads/main/PRECISE"))() ]]
 local LINEAR_LOADSTRING  = [[ loadstring(game:HttpGet("https://raw.githubusercontent.com/goofyashnkr/Linear/refs/heads/main/LINEAR%20SCRIPT"))() ]]
 
 -- [[ UI SETUP ]]
