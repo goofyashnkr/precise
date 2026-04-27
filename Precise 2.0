@@ -5,8 +5,9 @@ local Success, KeyData = pcall(function()
     return game:HttpGet("https://raw.githubusercontent.com/goofyashnkr/Linear/refs/heads/main/KEYS")
 end)
 
-local PRECISE_LOADSTRING = [[ loadstring(game:HttpGet("https://raw.githubusercontent.com/goofyashnkr/precise/refs/heads/main/PRECISE"))() ]]
-local LINEAR_LOADSTRING  = [[ loadstring(game:HttpGet("https://raw.githubusercontent.com/goofyashnkr/Linear/refs/heads/main/LINEAR%20SCRIPT"))() ]]
+-- URLs for the scripts
+local PRECISE_URL = "https://raw.githubusercontent.com/goofyashnkr/precise/refs/heads/main/PRECISE"
+local LINEAR_URL  = "https://raw.githubusercontent.com/goofyashnkr/Linear/refs/heads/main/LINEAR%20SCRIPT"
 
 -- [[ UI SETUP ]]
 local TweenService = game:GetService("TweenService")
@@ -19,15 +20,27 @@ MainFrame.BackgroundTransparency = 1
 
 -- [[ EXECUTION ENGINE ]]
 local function executeScript(mode)
-    local scriptToRun = (mode == "PRECISE") and PRECISE_LOADSTRING or LINEAR_LOADSTRING
-    local success, err = pcall(function()
-        loadstring(scriptToRun)()
-    end)
+    local targetUrl = (mode == "PRECISE") and PRECISE_URL or LINEAR_URL
     
-    if success then
-        ScreenGui:Destroy()
+    -- Attempt to download the script content
+    local downloadSuccess, scriptContent = pcall(function()
+        return game:HttpGet(targetUrl)
+    end)
+
+    if downloadSuccess and scriptContent then
+        -- Attempt to load the string
+        local loadedFunc, loadError = loadstring(scriptContent)
+        
+        if loadedFunc then
+            ScreenGui:Destroy() -- Clean up UI
+            task.spawn(loadedFunc) -- Run the script in a new thread
+        else
+            warn("!! SYNTAX ERROR IN GITHUB SCRIPT !!")
+            warn(loadError)
+        end
     else
-        warn("Execution Error: " .. err)
+        warn("!! FAILED TO DOWNLOAD SCRIPT FROM GITHUB !!")
+        warn("Link tried: " .. targetUrl)
     end
 end
 
@@ -64,7 +77,14 @@ end
 local PreciseBtn = createTile("PRECISE 2.0", UDim2.new(0.02, 0, 0.25, 0), Color3.fromRGB(0, 170, 255))
 local LinearBtn = createTile("LINEAR", UDim2.new(0.53, 0, 0.25, 0), Color3.fromRGB(160, 160, 160))
 
--- [[ LINEAR KEY SYSTEM ]]
+-- [[ LOGIC ]]
+
+-- PRECISE Logic
+PreciseBtn.MouseButton1Click:Connect(function()
+    executeScript("PRECISE")
+end)
+
+-- LINEAR Logic
 LinearBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
     
@@ -92,12 +112,11 @@ LinearBtn.MouseButton1Click:Connect(function()
     Instance.new("UICorner", submit)
 
     local back = Instance.new("TextButton", KeyFrame)
-    back.Size = UDim2.new(0.8, 0, 0, 40)
-    back.Position = UDim2.new(0.1, 0, 0.75, 0)
+    back.Size = UDim2.new(0, 100, 0, 30)
+    back.Position = UDim2.new(0.5, -50, 0.8, 0)
     back.BackgroundTransparency = 1
-    back.Text = "← GO BACK"
-    back.TextColor3 = Color3.fromRGB(100, 100, 100)
-    back.Font = Enum.Font.Gotham
+    back.Text = "← BACK"
+    back.TextColor3 = Color3.fromRGB(120, 120, 120)
     back.TextSize = 14
 
     back.MouseButton1Click:Connect(function()
@@ -106,11 +125,10 @@ LinearBtn.MouseButton1Click:Connect(function()
     end)
 
     submit.MouseButton1Click:Connect(function()
-        local userInput = input.Text:gsub("%s+", "") -- Remove spaces from user input
+        local userInput = input.Text:gsub("%s+", "")
         local authorized = false
         
         if Success and KeyData then
-            -- Loop through each line in the GitHub file to find an exact match
             for key in KeyData:gmatch("[^\r\n]+") do
                 if key:gsub("%s+", "") == userInput then
                     authorized = true
@@ -128,9 +146,4 @@ LinearBtn.MouseButton1Click:Connect(function()
             input.PlaceholderColor3 = Color3.new(1, 0, 0)
         end
     end)
-end)
-
--- PRECISE Logic
-PreciseBtn.MouseButton1Click:Connect(function()
-    executeScript("PRECISE")
 end)
